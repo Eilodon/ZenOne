@@ -30,7 +30,7 @@ export interface LTLFormula {
   description: string;
 
   // For atomic propositions
-  predicate?: (state: RuntimeState, event?: KernelEvent) => boolean;
+  predicate?: (state: RuntimeState, event: KernelEvent | undefined, trace: KernelEvent[]) => boolean;
 
   // For composite formulas
   subformula?: LTLFormula;
@@ -94,20 +94,45 @@ export const SAFETY_SPECS: LTLFormula[] = [
 
   {
     operator: 'G',
+    name: 'pattern_stability',
+    description: 'Protocol cannot be changed more than once every 60 seconds',
+    subformula: {
+      operator: 'ATOMIC',
+      name: 'check_pattern_stability',
+      description: 'Check last pattern change',
+      predicate: (state, event, trace) => {
+        if (event?.type === 'LOAD_PROTOCOL') {
+          // Find last LOAD_PROTOCOL in trace
+          const lastLoad = trace.slice().reverse().find(e => e.type === 'LOAD_PROTOCOL');
+          if (lastLoad) {
+            const timeSince = (event.timestamp - lastLoad.timestamp) / 1000;
+            if (timeSince < 60) return false; // Violation: Too soon
+          }
+        }
+        return true;
+      }
+    }
+  },
+
+  {
+    operator: 'G',
     name: 'panic_halt',
     description: 'High prediction error must trigger halt',
     subformula: {
       operator: 'ATOMIC',
       name: 'halt_on_panic',
       description: 'Check emergency halt',
-      predicate: (state) => {
+      predicate: (state, event) => {
         // If prediction_error > 0.95 and session > 10s, status should be HALTED or SAFETY_LOCK
+        // UNLESS the event is literally halting it right now
         if (
           state.belief.prediction_error > 0.95 &&
           state.sessionDuration > 10 &&
           state.status === 'RUNNING'
         ) {
-          return false; // Should have halted by now
+          if (event?.type !== 'HALT' && event?.type !== 'SAFETY_INTERDICTION') {
+            return false;
+          }
         }
         return true;
       }
@@ -152,6 +177,8 @@ export interface SafetyViolation {
 
 export class SafetyMonitor {
   private violations: SafetyViolation[] = [];
+  private trace: KernelEvent[] = [];
+  private readonly MAX_TRACE = 100;
   private readonly MAX_VIOLATIONS = 100;
 
   /**
@@ -165,7 +192,7 @@ export class SafetyMonitor {
   } {
     // Evaluate all safety properties
     for (const spec of SAFETY_SPECS) {
-      const satisfied = this.evaluate(spec, currentState, event);
+      const satisfied = this.evaluate(spec, currentState, event, this.trace);
 
       if (!satisfied) {
         // SAFETY VIOLATION DETECTED
@@ -196,7 +223,7 @@ export class SafetyMonitor {
 
     // Check liveness properties (warnings only)
     for (const spec of LIVENESS_SPECS) {
-      const satisfied = this.evaluate(spec, currentState, event);
+      const satisfied = this.evaluate(spec, currentState, event, this.trace);
       if (!satisfied) {
         const violation: SafetyViolation = {
           timestamp: Date.now(),
@@ -211,25 +238,31 @@ export class SafetyMonitor {
       }
     }
 
+    // Update trace (only if event is allowed or partially allowed? Actually we should record ALL attempts?)
+    // For now, we record here. But if it's shielded, we might record the shielded one later?
+    // Let's record the *input* event for context.
+    this.trace.push(event);
+    if (this.trace.length > this.MAX_TRACE) this.trace.shift();
+
     return { safe: true };
   }
 
   /**
    * Evaluate an LTL formula
    */
-  private evaluate(formula: LTLFormula, state: RuntimeState, event?: KernelEvent): boolean {
+  private evaluate(formula: LTLFormula, state: RuntimeState, event: KernelEvent | undefined, trace: KernelEvent[]): boolean {
     switch (formula.operator) {
       case 'ATOMIC':
-        return formula.predicate ? formula.predicate(state, event) : true;
+        return formula.predicate ? formula.predicate(state, event, trace) : true;
 
       case 'G': // Globally (always)
         // For runtime verification, we check the current state
         // (Full LTL would require trace history, but we simplify here)
-        return formula.subformula ? this.evaluate(formula.subformula, state, event) : true;
+        return formula.subformula ? this.evaluate(formula.subformula, state, event, trace) : true;
 
       case 'F': // Finally (eventually)
         // For liveness, we just check current state as a heuristic
-        return formula.subformula ? this.evaluate(formula.subformula, state, event) : true;
+        return formula.subformula ? this.evaluate(formula.subformula, state, event, trace) : true;
 
       case 'X': // Next (not implemented in this simplified version)
         return true;

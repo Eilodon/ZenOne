@@ -300,8 +300,13 @@ export class SecureBioFS {
     // Metadata is stored separately (not encrypted for performance)
     // In production, consider encrypting sensitive metadata too
     if (this.backend === 'sqlite') {
-      // TODO: Implement SQLite metadata table
-      return undefined;
+      let result: string | undefined;
+      this.db.exec({
+        sql: `SELECT value FROM meta WHERE key = ?`,
+        bind: [key],
+        callback: (row: any) => { result = row[0]; }
+      });
+      return result ? JSON.parse(result) : undefined;
     } else {
       const { openDB } = await import('idb');
       const db = await openDB('zenb-bio-os', 2);
@@ -311,7 +316,10 @@ export class SecureBioFS {
 
   async setMeta(key: string, value: any): Promise<void> {
     if (this.backend === 'sqlite') {
-      // TODO: Implement SQLite metadata table
+      this.db.exec({
+        sql: `INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)`,
+        bind: [key, JSON.stringify(value)]
+      });
       return;
     } else {
       const { openDB } = await import('idb');
@@ -339,6 +347,11 @@ export class SecureBioFS {
         iv TEXT NOT NULL,
         ciphertext TEXT NOT NULL,
         signature TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS meta (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
       );
 
       CREATE INDEX IF NOT EXISTS idx_timestamp ON event_log(timestamp);
