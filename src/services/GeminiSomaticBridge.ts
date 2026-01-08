@@ -1,6 +1,7 @@
 import { GoogleGenAI, LiveServerMessage, Modality, Type, Tool, LiveSession } from "@google/genai";
 import { PureZenBKernel } from './PureZenBKernel';
 import { BreathingType } from '../types';
+import { ToolExecutor } from './AIToolRegistry';
 
 // --- AUDIO UTILS (PCM 16-bit, 16kHz/24kHz) ---
 
@@ -93,6 +94,7 @@ FAILSAFE:
 
 export class GeminiSomaticBridge {
   private kernel: PureZenBKernel;
+  private toolExecutor: ToolExecutor;  // NEW: Safe function calling
   private session: LiveSession | null = null;
   private audioContext: AudioContext | null = null;
   private inputProcessor: ScriptProcessorNode | null = null;
@@ -100,9 +102,10 @@ export class GeminiSomaticBridge {
   private nextStartTime = 0;
   private isConnected = false;
   private unsubKernel: (() => void) | null = null;
-  
+
   constructor(kernel: PureZenBKernel) {
     this.kernel = kernel;
+    this.toolExecutor = new ToolExecutor(kernel);
   }
 
   public async connect() {
@@ -265,51 +268,56 @@ export class GeminiSomaticBridge {
         this.nextStartTime = start + buffer.duration;
     }
 
-    // 2. Handle Function Calls
+    // 2. Handle Function Calls (v6.7 - SAFE EXECUTION)
     const toolCall = message.toolCall;
     if (toolCall) {
         this.kernel.dispatch({ type: 'AI_STATUS_CHANGE', status: 'thinking', timestamp: Date.now() });
-        
+
         for (const fc of toolCall.functionCalls) {
-            console.log(`[ZenB Bridge] Executing Neuro-Command: ${fc.name}`, fc.args);
+            console.log(`[ZenB Bridge] AI Tool Call: ${fc.name}`, fc.args);
             this.kernel.dispatch({ type: 'AI_INTERVENTION', intent: fc.name, parameters: fc.args, timestamp: Date.now() });
-            
-            let result: Record<string, any> = { status: 'failed' };
-            
-            if (fc.name === 'adjust_tempo') {
-                const scale = Number(fc.args['scale']);
-                const reason = String(fc.args['reason']);
-                this.kernel.dispatch({
-                    type: 'ADJUST_TEMPO',
-                    scale: scale,
-                    reason: `AI: ${reason}`,
-                    timestamp: Date.now()
-                });
-                result = { status: 'success', new_tempo: scale };
-            }
-            
-            if (fc.name === 'switch_pattern') {
-                const pid = String(fc.args['patternId']) as BreathingType;
-                // Dispatch kernel load
-                this.kernel.dispatch({
-                    type: 'LOAD_PROTOCOL',
-                    patternId: pid,
-                    timestamp: Date.now()
-                });
-                this.kernel.dispatch({ type: 'START_SESSION', timestamp: Date.now() });
-                result = { status: 'switched', pattern: pid };
+
+            // Execute via ToolRegistry (with validation + safety checks)
+            const execResult = await this.toolExecutor.execute(fc.name, fc.args);
+
+            let responseToAI: Record<string, any>;
+
+            if (execResult.success) {
+                responseToAI = execResult.result;
+                console.log(`[ZenB Bridge] Tool executed successfully:`, responseToAI);
+            } else if (execResult.needsConfirmation) {
+                // Request user confirmation
+                console.warn(`[ZenB Bridge] Tool requires confirmation:`, execResult.error);
+                responseToAI = {
+                  status: 'pending_confirmation',
+                  message: execResult.error,
+                  instruction: 'Please ask the user to confirm this action explicitly before proceeding.'
+                };
+
+                // TODO: Show UI confirmation dialog
+                // this.toolExecutor.requestConfirmation(fc.name, fc.args, (confirmed) => { ... });
+            } else {
+                // Execution failed (safety violation, rate limit, etc.)
+                console.error(`[ZenB Bridge] Tool execution failed:`, execResult.error);
+                responseToAI = {
+                  status: 'failed',
+                  error: execResult.error,
+                  instruction: 'Do not retry this action. Inform the user why it was rejected.'
+                };
             }
 
+            // Send response back to Gemini
             if (this.session) {
                 this.session.sendToolResponse({
                     functionResponses: [{
                         id: fc.id,
                         name: fc.name,
-                        response: { result }
+                        response: { result: responseToAI }
                     }]
                 });
             }
         }
+
         this.kernel.dispatch({ type: 'AI_STATUS_CHANGE', status: 'connected', timestamp: Date.now() });
     }
   }
