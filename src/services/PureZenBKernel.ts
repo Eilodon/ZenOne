@@ -1,17 +1,20 @@
 
 /**
-*    ZENB KERNEL V6.6 - SENTIENT OS (LEVEL 3)
-* ===========================================
+*    ZENB KERNEL V6.7 - SENTIENT OS (LEVEL 3 + FORMAL VERIFICATION)
+* ================================================================
 *    CAPABILITIES:
 *    1. Autonomic Reflex (Sympathetic Override)
 *    2. Resonance Watchdog
 *    3. Strict Type Bounds (Safety)
+*    4. [NEW] LTL Runtime Monitor + Safety Shield
+*    5. [NEW] PID Control (replaces proportional-only)
 */
 import { BreathPattern, BreathPhase, KernelEvent, BeliefState, BREATHING_PATTERNS, Observation, SafetyProfile } from '../types';
 import { AdaptiveStateEstimator } from './AdaptiveStateEstimator';
 import { nextPhaseSkipZero, isCycleBoundary } from './phaseMachine';
 import { audioMiddleware, hapticMiddleware, biofeedbackMiddleware, Middleware } from './kernelMiddleware';
 import { SafetyConfigType } from '../config/SafetyConfig';
+import { SafetyMonitor } from './SafetyMonitor';
 
 // --- TYPES ---
 
@@ -235,6 +238,7 @@ function reduce(state: RuntimeState, event: KernelEvent): RuntimeState {
 export class PureZenBKernel {
   private state: RuntimeState;
   private estimator: AdaptiveStateEstimator;
+  private safetyMonitor: SafetyMonitor;  // NEW: Formal verification
   private eventLog: KernelEvent[] = [];
   private readonly MAX_LOG_SIZE = 1000;
   private subscribers = new Set<(state: RuntimeState) => void>();
@@ -242,7 +246,7 @@ export class PureZenBKernel {
   private commandQueue: KernelEvent[] = [];
   private fs: any;
   private config: SafetyConfigType;
-  
+
   private lastNotifyTime = 0;
   private readonly NOTIFY_INTERVAL = 16;
   private lastNotifiedPhase: string | null = null;
@@ -256,13 +260,16 @@ export class PureZenBKernel {
     this.config = config;
     this.fs = fs;
     this.state = createInitialState();
-    
+
     this.estimator = new AdaptiveStateEstimator({
         alpha: 1.5e-3,
         adaptive_r: true,
         q_base: 0.015,
         r_adaptation_rate: 0.2
     });
+
+    // NEW: Initialize Safety Monitor (LTL + Shield)
+    this.safetyMonitor = new SafetyMonitor();
 
     this.use(audioMiddleware);
     this.use(hapticMiddleware);
@@ -277,8 +284,24 @@ export class PureZenBKernel {
     this.fs.garbageCollect(this.config.persistence.retentionMs);
   }
   
-  // --- INTERNAL SAFETY GUARD (THE HIPPOCRATIC LAYER) ---
+  // --- INTERNAL SAFETY GUARD (THE HIPPOCRATIC LAYER V6.7) ---
   private safetyGuard(event: KernelEvent, state: RuntimeState): KernelEvent | null {
+    // LAYER 1: Formal Verification (LTL Monitor + Shield)
+    const monitorResult = this.safetyMonitor.checkEvent(event, state);
+
+    if (!monitorResult.safe) {
+      if (monitorResult.correctedEvent) {
+        // Shield corrected the event - use corrected version
+        console.log('[Kernel] Safety Shield corrected event:', monitorResult.violation?.propertyName);
+        return monitorResult.correctedEvent;
+      } else {
+        // Cannot be corrected - reject event entirely
+        console.error('[Kernel] Safety violation - event rejected:', monitorResult.violation);
+        return null;
+      }
+    }
+
+    // LAYER 2: Legacy safety checks (kept for defense-in-depth)
     if (state.status === 'SAFETY_LOCK' && event.type === 'START_SESSION') {
        return { type: 'SAFETY_INTERDICTION', riskLevel: 1.0, action: 'REJECT_START', timestamp: Date.now() };
     }
