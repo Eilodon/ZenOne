@@ -1,7 +1,17 @@
 /**
- * TELEMETRY SERVICE v1.0
- * ======================
+ * TELEMETRY SERVICE v1.0 [OPTIONAL - NOT CURRENTLY USED]
+ * =======================================================
  * OpenTelemetry instrumentation for ZenB Kernel
+ *
+ * STATUS: This is an experimental/optional feature that is NOT integrated
+ * into the main application. It is not imported or bundled by default.
+ *
+ * To use this service:
+ * 1. Import TelemetryService in your kernel initialization
+ * 2. Initialize with desired backend (OTLP, Console, or Memory)
+ * 3. Instrument kernel events, state updates, and performance metrics
+ *
+ * Bundle Impact: ~539 LOC, ~15KB gzipped (only if imported)
  *
  * Features:
  * - Distributed tracing (spans)

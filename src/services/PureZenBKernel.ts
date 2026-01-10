@@ -10,7 +10,6 @@
 *    5. [NEW] PID Control (replaces proportional-only)
 */
 import { BreathPattern, BreathPhase, KernelEvent, BeliefState, BREATHING_PATTERNS, Observation, SafetyProfile } from '../types';
-import { AdaptiveStateEstimator } from './AdaptiveStateEstimator';
 import { UKFStateEstimator } from './UKFStateEstimator';
 import { nextPhaseSkipZero, isCycleBoundary } from './phaseMachine';
 import { audioMiddleware, hapticMiddleware, biofeedbackMiddleware, Middleware } from './kernelMiddleware';
@@ -238,7 +237,6 @@ function reduce(state: RuntimeState, event: KernelEvent): RuntimeState {
 
 export class PureZenBKernel {
   private state: RuntimeState;
-  private estimator: AdaptiveStateEstimator;
   private primaryEstimator: UKFStateEstimator;
   private safetyMonitor: SafetyMonitor;  // NEW: Formal verification
   private eventLog: KernelEvent[] = [];
@@ -246,6 +244,7 @@ export class PureZenBKernel {
   private subscribers = new Set<(state: RuntimeState) => void>();
   private middlewares: Middleware[] = [];
   private commandQueue: KernelEvent[] = [];
+  private isProcessing = false;  // Serialization guard to prevent re-entrant dispatch
   private fs: any;
   private config: SafetyConfigType;
 
@@ -263,21 +262,14 @@ export class PureZenBKernel {
     this.fs = fs;
     this.state = createInitialState();
 
-    this.estimator = new AdaptiveStateEstimator({
-      alpha: 1.5e-3,
-      adaptive_r: true,
-      q_base: 0.015,
-      r_adaptation_rate: 0.2
-    });
-
-    // NEW: UKF Estimator (Primary)
+    // UKF Estimator (with built-in dead reckoning)
     this.primaryEstimator = new UKFStateEstimator({
       alpha: 0.001,
       beta: 2.0,
       kappa: 0
     });
 
-    // NEW: Initialize Safety Monitor (LTL + Shield)
+    // Initialize Safety Monitor (LTL + Shield)
     this.safetyMonitor = new SafetyMonitor();
 
     this.use(audioMiddleware);
@@ -357,8 +349,15 @@ export class PureZenBKernel {
     }
 
     if (this.divergenceAccumulatorMs > this.config.watchdog.maxDivergenceTimeMs) {
-      console.error("[Kernel] Watchdog: Resetting Rhythm.");
+      console.error("[Kernel] Watchdog: Resetting Rhythm and UKF Covariance.");
       this.divergenceAccumulatorMs = 0;
+
+      // CRITICAL: Reset UKF covariance to prevent persistent divergence
+      // When prediction error is high for 30s, the covariance matrix P
+      // has grown too large, causing poor sigma point generation.
+      // Resetting P allows the filter to re-converge from a known-good state.
+      this.primaryEstimator.resetCovariance();
+
       this.commandQueue.push({ type: 'ADJUST_TEMPO', scale: 1.0, reason: 'WATCHDOG_RESET', timestamp: Date.now() });
       this.commandQueue.push({ type: 'AI_VOICE_MESSAGE', text: 'Resetting rhythm.', sentiment: 'system', timestamp: Date.now() });
     }
@@ -445,20 +444,42 @@ export class PureZenBKernel {
   // --- PUBLIC API ---
 
   public dispatch(event: KernelEvent): void {
-    if (event.type === 'HALT') {
-      this.analyzeSessionTrauma(this.state);
-      this.divergenceAccumulatorMs = 0;
-      this.traumaAccumulatorMs = 0;
+    // Add event to queue
+    this.commandQueue.push(event);
+
+    // If already processing, return (serialization)
+    if (this.isProcessing) {
+      return;
     }
 
-    this.processEvent(event);
+    // Mark as processing
+    this.isProcessing = true;
 
+    // Process queue until empty (with depth guard)
     let depth = 0;
-    const MAX_DEPTH = 5;
+    const MAX_DEPTH = 50;  // Increased from 5 to handle longer chains
+
     while (this.commandQueue.length > 0 && depth < MAX_DEPTH) {
-      const cmd = this.commandQueue.shift();
-      if (cmd) this.processEvent(cmd);
+      const cmd = this.commandQueue.shift()!;
+
+      // Special handling for HALT
+      if (cmd.type === 'HALT') {
+        this.analyzeSessionTrauma(this.state);
+        this.divergenceAccumulatorMs = 0;
+        this.traumaAccumulatorMs = 0;
+      }
+
+      this.processEvent(cmd);
       depth++;
+    }
+
+    // Done processing
+    this.isProcessing = false;
+
+    // Warn if queue overflow
+    if (this.commandQueue.length > 0) {
+      console.warn(`[Kernel] Event queue overflow: ${this.commandQueue.length} events dropped (MAX_DEPTH=${MAX_DEPTH})`);
+      this.commandQueue = [];  // Clear to prevent infinite loop
     }
   }
 
@@ -488,26 +509,14 @@ export class PureZenBKernel {
   public tick(dt: number, observation: Observation): void {
     const now = Date.now();
 
-    this.estimator.setProtocol(this.state.pattern);
-    const adaptiveBelief = this.estimator.update(observation, dt);
-
+    // UKF State Estimation (with built-in dead reckoning)
+    // When sensors fail (hr_confidence < 0.3), UKF automatically falls back to
+    // prediction-only mode (no correction step), which is equivalent to dead reckoning.
+    // This eliminates the need for a separate AdaptiveStateEstimator.
     this.primaryEstimator.setProtocol(this.state.pattern);
-    const ukfBelief = this.primaryEstimator.update(observation, dt);
+    const belief = this.primaryEstimator.update(observation, dt);
 
-    // MIXING STRATEGY: Hot Standby
-    // Use UKF (Primary) when sensors are good (>30% confidence)
-    // Fallback to Adaptive (Dead Reckoning) when sensors drop out
-    let finalBelief = adaptiveBelief;
-    const sensorConfidence = observation.hr_confidence ?? 0;
-    const sensorActive = sensorConfidence > 0.3;
-
-    if (sensorActive) {
-      finalBelief = ukfBelief;
-      // Sync Adaptive internal state to UKF so it's ready to take over
-      // (This requires AdaptiveStateEstimator to have a sync/reset method, or just trust it converges fast enough)
-    }
-
-    this.dispatch({ type: 'BELIEF_UPDATE', belief: finalBelief, timestamp: now });
+    this.dispatch({ type: 'BELIEF_UPDATE', belief, timestamp: now });
 
     if (this.state.status === 'RUNNING' && this.state.pattern) {
       // RUN LEVEL 3 WATCHDOG

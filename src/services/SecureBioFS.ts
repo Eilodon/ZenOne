@@ -1,22 +1,30 @@
 /**
- * SECURE BIO FILESYSTEM - SQLITE WASM + ENCRYPTION
- * ==================================================
+ * SECURE BIO FILESYSTEM - ENCRYPTED INDEXEDDB
+ * ============================================
  *
- * Upgrade from plain IndexedDB to encrypted SQLite with:
+ * Encrypted storage for kernel events using IndexedDB:
  * - AES-256-GCM encryption at rest
  * - HMAC-SHA256 integrity verification
- * - SQL query capabilities
- * - ACID transactions
- * - Graceful fallback to IndexedDB if SQLite unavailable
+ * - Per-event encryption with unique IV
+ * - Signature verification on read
  *
  * Security Features:
  * - Key derivation via PBKDF2 (100k iterations)
- * - Per-event encryption with unique IV
- * - Signature verification on read
- * - Automatic key rotation (future)
+ * - Authenticated encryption (AES-GCM)
+ * - Integrity verification (HMAC-SHA256)
+ *
+ * THREAT MODEL:
+ * - Protects against: Physical storage extraction, malware with file access
+ * - Does NOT protect against: XSS attacks with memory access, browser extensions
+ * - Keys stored in memory (required by Web Crypto API architecture)
+ * - Device fingerprint is NOT cryptographically secure (convenience, not security)
+ *
+ * For stronger security:
+ * - Use user-provided passphrase instead of device fingerprint
+ * - Implement CSP to prevent XSS
+ * - Consider WebAuthn for hardware-backed keys (future enhancement)
  *
  * References:
- * - SQLite WASM: https://sqlite.org/wasm
  * - Web Crypto API: https://w3c.github.io/webcrypto/
  * - NIST SP 800-38D: AES-GCM recommendations
  */
@@ -184,8 +192,7 @@ interface EncryptedEvent {
 
 export class SecureBioFS {
   private crypto: CryptoService;
-  private backend: 'sqlite' | 'indexeddb' = 'indexeddb';
-  private db: any = null;  // SQLite or IndexedDB database
+  private db: any = null;  // IndexedDB database
   private isInitialized = false;
 
   constructor() {
@@ -203,18 +210,11 @@ export class SecureBioFS {
     // Initialize crypto
     await this.crypto.init(devicePassphrase);
 
-    // Try SQLite WASM first, fallback to IndexedDB
-    try {
-      await this.initSQLite();
-      this.backend = 'sqlite';
-      console.log('[SecureBioFS] Using SQLite WASM backend');
-    } catch (err) {
-      console.warn('[SecureBioFS] SQLite unavailable, falling back to IndexedDB:', err);
-      await this.initIndexedDB();
-      this.backend = 'indexeddb';
-    }
+    // Initialize IndexedDB backend
+    await this.initIndexedDB();
 
     this.isInitialized = true;
+    console.log('[SecureBioFS] Initialized with encrypted IndexedDB backend');
   }
 
   /**
@@ -242,12 +242,8 @@ export class SecureBioFS {
       signature: this.arrayBufferToBase64(signature)
     };
 
-    // 5. Write to backend
-    if (this.backend === 'sqlite') {
-      await this.writeSQLite(encryptedEvent);
-    } else {
-      await this.writeIndexedDB(encryptedEvent);
-    }
+    // 5. Write to IndexedDB
+    await this.db.put('event_log', encryptedEvent);
   }
 
   /**
@@ -256,13 +252,11 @@ export class SecureBioFS {
   async queryEvents(startTime: number, endTime: number): Promise<KernelEvent[]> {
     if (!this.isInitialized) throw new Error('SecureBioFS not initialized');
 
-    // 1. Fetch encrypted events from backend
-    let encryptedEvents: EncryptedEvent[];
-    if (this.backend === 'sqlite') {
-      encryptedEvents = await this.querySQLite(startTime, endTime);
-    } else {
-      encryptedEvents = await this.queryIndexedDB(startTime, endTime);
-    }
+    // 1. Fetch encrypted events from IndexedDB
+    const tx = this.db.transaction('event_log', 'readonly');
+    const index = tx.store.index('timestamp');
+    const range = IDBKeyRange.bound(startTime, endTime);
+    const encryptedEvents: EncryptedEvent[] = await index.getAll(range);
 
     // 2. Decrypt and verify
     const events: KernelEvent[] = [];
@@ -299,98 +293,14 @@ export class SecureBioFS {
   async getMeta<T = any>(key: string): Promise<T | undefined> {
     // Metadata is stored separately (not encrypted for performance)
     // In production, consider encrypting sensitive metadata too
-    if (this.backend === 'sqlite') {
-      let result: string | undefined;
-      this.db.exec({
-        sql: `SELECT value FROM meta WHERE key = ?`,
-        bind: [key],
-        callback: (row: any) => { result = row[0]; }
-      });
-      return result ? JSON.parse(result) : undefined;
-    } else {
-      const { openDB } = await import('idb');
-      const db = await openDB('zenb-bio-os', 2);
-      return await db.get('meta', key);
-    }
+    return await this.db.get('meta', key);
   }
 
   async setMeta(key: string, value: any): Promise<void> {
-    if (this.backend === 'sqlite') {
-      this.db.exec({
-        sql: `INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)`,
-        bind: [key, JSON.stringify(value)]
-      });
-      return;
-    } else {
-      const { openDB } = await import('idb');
-      const db = await openDB('zenb-bio-os', 2);
-      await db.put('meta', value, key);
-    }
+    await this.db.put('meta', value, key);
   }
 
-  // --- SQLITE BACKEND ---
-
-  private async initSQLite(): Promise<void> {
-    // Dynamic import (SQLite WASM is large, ~1MB)
-    // @ts-ignore - SQLite WASM types
-    const sqlite3InitModule = (await import('@sqlite.org/sqlite-wasm')).default;
-    const sqlite3 = await sqlite3InitModule();
-
-    this.db = new sqlite3.oo1.DB();
-
-    // Create schema
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS event_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp INTEGER NOT NULL,
-        type TEXT NOT NULL,
-        iv TEXT NOT NULL,
-        ciphertext TEXT NOT NULL,
-        signature TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS meta (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_timestamp ON event_log(timestamp);
-      CREATE INDEX IF NOT EXISTS idx_type ON event_log(type);
-    `);
-  }
-
-  private async writeSQLite(event: EncryptedEvent): Promise<void> {
-    this.db.exec({
-      sql: `INSERT INTO event_log (timestamp, type, iv, ciphertext, signature)
-            VALUES (?, ?, ?, ?, ?)`,
-      bind: [event.timestamp, event.type, event.iv, event.ciphertext, event.signature]
-    });
-  }
-
-  private async querySQLite(startTime: number, endTime: number): Promise<EncryptedEvent[]> {
-    const results: EncryptedEvent[] = [];
-
-    this.db.exec({
-      sql: `SELECT * FROM event_log
-            WHERE timestamp BETWEEN ? AND ?
-            ORDER BY timestamp ASC`,
-      bind: [startTime, endTime],
-      callback: (row: any) => {
-        results.push({
-          id: row.id,
-          timestamp: row.timestamp,
-          type: row.type,
-          iv: row.iv,
-          ciphertext: row.ciphertext,
-          signature: row.signature
-        });
-      }
-    });
-
-    return results;
-  }
-
-  // --- INDEXEDDB BACKEND (FALLBACK) ---
+  // --- INDEXEDDB BACKEND ---
 
   private async initIndexedDB(): Promise<void> {
     const { openDB } = await import('idb');
@@ -406,20 +316,6 @@ export class SecureBioFS {
         db.createObjectStore('meta');
       }
     });
-  }
-
-  private async writeIndexedDB(event: EncryptedEvent): Promise<void> {
-    await this.db.put('event_log', event);
-  }
-
-  private async queryIndexedDB(startTime: number, endTime: number): Promise<EncryptedEvent[]> {
-    const tx = this.db.transaction('event_log', 'readonly');
-    const index = tx.store.index('timestamp');
-
-    const range = IDBKeyRange.bound(startTime, endTime);
-    const results = await index.getAll(range);
-
-    return results;
   }
 
   // --- UTILITIES ---

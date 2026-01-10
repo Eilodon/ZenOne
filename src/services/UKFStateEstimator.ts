@@ -147,6 +147,15 @@ export class UKFStateEstimator {
   }
 
   /**
+   * Reset covariance matrix to initial state
+   * Used for emergency recovery when matrix becomes non-positive-definite
+   */
+  public resetCovariance(): void {
+    this.P = this.createIdentity(5, 0.2);  // Reset to initial uncertainty
+    console.warn('[UKF] Covariance matrix reset to initial state due to numerical instability');
+  }
+
+  /**
    * Main update step
    */
   public update(obs: Observation, dt: number): BeliefState {
@@ -397,7 +406,23 @@ export class UKFStateEstimator {
           sum += L[i][k] * L[j][k];
         }
         if (i === j) {
-          L[i][j] = Math.sqrt(Math.max(0, A[i][i] - sum));
+          const diag = A[i][i] - sum;
+
+          // CRITICAL: Detect non-positive-definite matrix
+          if (diag <= 1e-10) {
+            console.error(
+              '[UKF] Matrix not positive-definite (diagonal=%f at i=%d). Resetting covariance to prevent corruption.',
+              diag, i
+            );
+
+            // Emergency reset to known-good state
+            this.resetCovariance();
+
+            // Retry with fresh covariance
+            return this.choleskyDecomposition(this.P);
+          }
+
+          L[i][j] = Math.sqrt(diag);
         } else {
           L[i][j] = (A[i][j] - sum) / (L[j][j] + 1e-10);
         }
