@@ -48,7 +48,7 @@ interface RGBSample {
 export class RPPGProcessor {
   private config: Required<RPPGConfig>;
   private rgbBuffer: RGBSample[] = [];
-  private lastPeaks: number[] = [];
+  // private _lastPeaks: number[] = [];
 
   constructor(config?: Partial<RPPGConfig>) {
     this.config = {
@@ -130,7 +130,7 @@ export class RPPGProcessor {
     const confidence = this.assessConfidence(snr, rrIntervals);
     const quality = this.assessQuality(confidence);
 
-    this.lastPeaks = peaks;
+    // this._lastPeaks = peaks;
 
     return {
       heartRate,
@@ -201,15 +201,15 @@ export class RPPGProcessor {
    * Band-pass Butterworth filter (3rd order)
    * Pass frequencies corresponding to physiological HR range
    */
-  private bandPassFilter(signal: number[], hrRange: [number, number]): number[] {
+  private bandPassFilter(signal: number[], _hrRange: [number, number]): number[] {
     // Convert BPM to Hz
-    const lowCutoff = hrRange[0] / 60;  // Hz
-    const highCutoff = hrRange[1] / 60; // Hz
+    // const lowCutoff = hrRange[0] / 60;  // Hz
+    // const highCutoff = hrRange[1] / 60; // Hz
 
     // Normalize frequencies (Nyquist = sampleRate/2)
-    const nyquist = this.config.sampleRate / 2;
-    const lowNorm = lowCutoff / nyquist;
-    const highNorm = highCutoff / nyquist;
+    // const nyquist = this.config.sampleRate / 2;
+    // const lowNorm = lowCutoff / nyquist;
+    // const highNorm = highCutoff / nyquist;
 
     // Simple IIR filter implementation
     // For production, consider using a proper DSP library
@@ -370,7 +370,7 @@ export class RPPGProcessor {
    */
   public reset(): void {
     this.rgbBuffer = [];
-    this.lastPeaks = [];
+    // this._lastPeaks = [];
   }
 
   /**

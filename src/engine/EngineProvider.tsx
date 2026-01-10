@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 import { useBreathEngine } from '../hooks/useBreathEngine';
 
 /**

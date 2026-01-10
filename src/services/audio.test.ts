@@ -1,14 +1,22 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { setAiDucking } from './audio';
-import * as Tone from 'tone';
+
 
 // Mock Tone.js
 vi.mock('tone', () => {
   const rampTo = vi.fn();
   const cancelScheduledValues = vi.fn();
-  
+
   return {
     now: () => 100,
+    Panner3D: vi.fn(() => ({
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      positionX: { value: 0 },
+      positionY: { value: 0 },
+      positionZ: { value: 0 },
+      dispose: vi.fn()
+    })),
     Gain: vi.fn(() => ({
       gain: {
         value: 1,
@@ -32,10 +40,10 @@ vi.mock('tone', () => {
     Noise: vi.fn(() => ({ connect: vi.fn(), start: vi.fn(), dispose: vi.fn() })),
     Filter: vi.fn(() => ({ connect: vi.fn(), frequency: { connect: vi.fn(), setTargetAtTime: vi.fn() }, dispose: vi.fn() })),
     LFO: vi.fn(() => ({ connect: vi.fn(), start: vi.fn(), stop: vi.fn(), dispose: vi.fn() })),
-    MetalSynth: vi.fn(),
-    Chorus: vi.fn(),
-    PolySynth: vi.fn(),
-    Player: vi.fn(),
+    MetalSynth: vi.fn(() => ({ connect: vi.fn(), dispose: vi.fn(), volume: { value: 0 } })),
+    Chorus: vi.fn(() => ({ connect: vi.fn(), start: vi.fn(), dispose: vi.fn() })),
+    PolySynth: vi.fn(() => ({ connect: vi.fn(), dispose: vi.fn(), set: vi.fn(), triggerAttackRelease: vi.fn(), volume: { value: 0 } })),
+    Player: vi.fn(() => ({ connect: vi.fn(), start: vi.fn(), stop: vi.fn(), dispose: vi.fn(), volume: { value: 0 } })),
     start: vi.fn(),
     context: { state: 'running', resume: vi.fn() }
   };
@@ -45,28 +53,28 @@ vi.mock('tone', () => {
 import { unlockAudio } from './audio';
 
 describe('AudioEngine (Audio Ducking)', () => {
-  
+
   it('should ramp volume down when AI is speaking', async () => {
     // Trigger init to create duckingGain
-    await unlockAudio(); 
+    await unlockAudio();
 
     // Access the mock instance of Gain
     // Since Tone.Gain is a class, we need to find the instance created inside buildMasterChain
     // This is tricky with pure module state.
     // Instead, we verify that the function executes without error and interacts with Tone.
-    
+
     // Reset mocks
     vi.clearAllMocks();
 
     setAiDucking(true); // AI Speaking
-    
+
     // We expect Tone.now() to be called
     // We can't easily assert the specific instance method call without refactoring audio.ts 
     // to export the nodes or use dependency injection. 
     // However, given the code structure, testing that it runs without throwing is a basic sanity check 
     // for side-effect heavy modules in a unit test environment.
-    
+
     // A better approach for the future: Refactor audio.ts to be a class we can instantiate with injected Tone mock.
-    expect(true).toBe(true); 
+    expect(true).toBe(true);
   });
 });

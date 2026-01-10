@@ -170,7 +170,7 @@ export class EnhancedAffectRecognizer {
     const browFurrow = dist(leftInnerBrow, rightInnerBrow) / faceWidth;
 
     // Jaw angle (tension)
-    const chin = pts[152];
+
     const leftJaw = pts[172];
     const rightJaw = pts[397];
     const jawAngle = Math.atan2(
@@ -343,8 +343,8 @@ export class EnhancedAffectRecognizer {
   private detectMicroExpression(vad: VADState): boolean {
     // Calculate total VAD change from previous frame
     const change = Math.abs(vad.valence - this.prevVAD.valence) +
-                   Math.abs(vad.arousal - this.prevVAD.arousal) +
-                   Math.abs(vad.dominance - this.prevVAD.dominance);
+      Math.abs(vad.arousal - this.prevVAD.arousal) +
+      Math.abs(vad.dominance - this.prevVAD.dominance);
 
     this.changeHistory.push(change);
     if (this.changeHistory.length > 15) { // 15 frames = 500ms @ 30fps
@@ -354,7 +354,7 @@ export class EnhancedAffectRecognizer {
     // Micro-expression: Rapid spike then return to baseline
     const avgChange = this.changeHistory.reduce((a, b) => a + b, 0) / this.changeHistory.length;
     const isMicroExpression = change > this.MICRO_EXPR_THRESHOLD &&
-                              avgChange < this.MICRO_EXPR_THRESHOLD * 0.5;
+      avgChange < this.MICRO_EXPR_THRESHOLD * 0.5;
 
     return isMicroExpression;
   }

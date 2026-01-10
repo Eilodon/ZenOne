@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Award, Clock, Play, ArrowRight } from 'lucide-react';
 import clsx from 'clsx';
 import { unlockAudio } from '../../services/audio';
@@ -20,7 +20,7 @@ export const OnboardingModal = ({ onComplete, t }: Props) => {
   ];
 
   const handleNext = () => {
-    unlockAudio(); 
+    unlockAudio();
     if (step < steps.length - 1) setStep(step + 1);
     else onComplete();
   };
@@ -31,14 +31,14 @@ export const OnboardingModal = ({ onComplete, t }: Props) => {
         <div className="mb-10 p-8 rounded-full bg-white/[0.03] border border-white/5 shadow-2xl shadow-white/5 scale-100 transition-transform duration-500 ring-1 ring-white/5">{steps[step].icon}</div>
         <h2 className="text-3xl font-serif font-medium mb-4 tracking-wide text-white">{steps[step].title}</h2>
         <p className="text-white/60 mb-12 leading-relaxed max-w-[280px] font-sans font-light tracking-wide">{steps[step].text}</p>
-        
+
         <div className="flex gap-2.5 mb-12">
           {steps.map((_, i) => (
             <div key={i} className={clsx("h-0.5 rounded-full transition-all duration-700", i === step ? "w-8 bg-white" : "w-1.5 bg-white/10")} />
           ))}
         </div>
 
-        <button 
+        <button
           onClick={handleNext}
           className="w-full py-4 bg-white text-black font-sans font-medium text-sm tracking-widest uppercase rounded-xl active:scale-95 transition-transform flex items-center justify-center gap-2 hover:bg-white/90"
           aria-label="Next step"

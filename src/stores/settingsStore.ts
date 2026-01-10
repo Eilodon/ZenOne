@@ -1,8 +1,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { UserSettings, SessionHistoryItem, ColorTheme, QualityTier, Language, SoundPack, BreathingType, SafetyProfile, BeliefState } from '../types';
-import { useKernel } from '../kernel/KernelProvider';
+import { UserSettings, SessionHistoryItem, ColorTheme, QualityTier, Language, SoundPack, BreathingType, BeliefState } from '../types';
 import { bioFS } from '../services/bioFS';
 
 // NOTE: We need a way to access Kernel from store actions, but Zustand is outside React context.
@@ -35,7 +34,7 @@ type SettingsState = {
   toggleKernelMonitor: () => void;
   resetSafetyLock: (patternId: BreathingType) => void;
   toggleAiCoach: () => void; // v6.0
-  
+
   // Logic
   registerSessionComplete: (durationSec: number, patternId: BreathingType, cycles: number, finalBelief: BeliefState) => void;
 };
@@ -67,7 +66,7 @@ export const useSettingsStore = create<SettingsState>()(
         streak: 0,
         lastBreathDate: '',
         lastUsedPattern: '4-7-8',
-        safetyRegistry: {}, 
+        safetyRegistry: {},
         cameraVitalsEnabled: false,
         showKernelMonitor: false,
         aiCoachEnabled: false // v6.0 Default
@@ -109,54 +108,54 @@ export const useSettingsStore = create<SettingsState>()(
 
       registerSessionComplete: (durationSec, patternId, cycles, finalBelief) => {
         const state = get();
-        
+
         // --- HISTORY & STREAK ---
         let newHistory = state.history;
         if (durationSec > 10) {
-            const newItem: SessionHistoryItem = {
-                id: Date.now().toString() + Math.random().toString().slice(2, 6),
-                timestamp: Date.now(),
-                durationSec,
-                patternId,
-                cycles,
-                finalBelief: finalBelief
-            };
-            newHistory = [newItem, ...state.history].slice(0, 100);
+          const newItem: SessionHistoryItem = {
+            id: Date.now().toString() + Math.random().toString().slice(2, 6),
+            timestamp: Date.now(),
+            durationSec,
+            patternId,
+            cycles,
+            finalBelief: finalBelief
+          };
+          newHistory = [newItem, ...state.history].slice(0, 100);
         }
 
         let newStreak = state.userSettings.streak;
         let newLastDate = state.userSettings.lastBreathDate;
-        
+
         if (durationSec > 30) {
-            const today = getTodayString();
-            const yesterday = getYesterdayString();
-            
-            if (newLastDate === today) {
-                // Already breathed today
-            } else if (newLastDate === yesterday) {
-                newStreak += 1;
-                newLastDate = today;
-            } else {
-                newStreak = 1;
-                newLastDate = today;
-            }
+          const today = getTodayString();
+          const yesterday = getYesterdayString();
+
+          if (newLastDate === today) {
+            // Already breathed today
+          } else if (newLastDate === yesterday) {
+            newStreak += 1;
+            newLastDate = today;
+          } else {
+            newStreak = 1;
+            newLastDate = today;
+          }
         }
 
         set({
-            history: newHistory,
-            userSettings: {
-                ...state.userSettings,
-                streak: newStreak,
-                lastBreathDate: newLastDate,
-                lastUsedPattern: patternId,
-            }
+          history: newHistory,
+          userSettings: {
+            ...state.userSettings,
+            streak: newStreak,
+            lastBreathDate: newLastDate,
+            lastUsedPattern: patternId,
+          }
         });
       }
     }),
     {
       name: 'zenb-settings-storage',
-      partialize: (state) => ({ 
-        userSettings: state.userSettings, 
+      partialize: (state) => ({
+        userSettings: state.userSettings,
         hasSeenOnboarding: state.hasSeenOnboarding,
         history: state.history
       }),

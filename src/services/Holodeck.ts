@@ -1,8 +1,8 @@
-
 import { PureZenBKernel } from './PureZenBKernel';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useSessionStore } from '../stores/sessionStore';
-import { VitalSigns } from '../types';
+import { ZenVitalsSnapshot, Metric, QualityReport } from '../vitals/snapshot';
+import { SignalQuality } from '../vitals/reasons';
 
 /**
  * 🜂 THE HOLODECK (Simulation Runtime)
@@ -17,11 +17,11 @@ export class Holodeck {
     public isActive = false;
     private logs: LogEntry[] = [];
     private listeners = new Set<() => void>();
-    
+
     // Injected References
     private kernel: PureZenBKernel | null = null;
-    
-    private constructor() {}
+
+    private constructor() { }
 
     public static getInstance(): Holodeck {
         if (!Holodeck.instance) Holodeck.instance = new Holodeck();
@@ -33,9 +33,9 @@ export class Holodeck {
     }
 
     public getLogs() { return this.logs; }
-    
-    public clearLogs() { 
-        this.logs = []; 
+
+    public clearLogs() {
+        this.logs = [];
         this.notify();
     }
 
@@ -56,13 +56,13 @@ export class Holodeck {
 
     public async runScenario(scenarioId: string): Promise<void> {
         if (!this.kernel) { this.log("Kernel not attached!", 'fail'); return; }
-        
+
         this.isActive = true;
         this.clearLogs();
         this.notify();
 
         try {
-            switch(scenarioId) {
+            switch (scenarioId) {
                 case 'nominal': await this.scenarioNominal(); break;
                 case 'panic': await this.scenarioPanicResponse(); break;
                 case 'ai_tune': await this.scenarioAiTuning(); break;
@@ -80,14 +80,14 @@ export class Holodeck {
     // --- SCENARIO 01: NOMINAL FLOW ---
     private async scenarioNominal() {
         this.log("Initializing SCENARIO 01: NOMINAL FLOW", 'info');
-        
+
         // 1. Setup Environment
         useSettingsStore.getState().setQuality('low');
-        
+
         // 2. Start Session (4-7-8)
         this.log("Action: Start Session (4-7-8)", 'info');
         useSessionStore.getState().startSession('4-7-8');
-        
+
         // Wait for Boot
         await this.wait(500);
         const state = this.kernel!.getState();
@@ -95,59 +95,57 @@ export class Holodeck {
         this.log("Kernel State: RUNNING", 'pass');
 
         // 3. Inject "Perfect" Bio-Data (Coherent HR)
-        this.startMockVitals(() => ({
-             heartRate: 60 + Math.sin(Date.now() / 1000) * 5, // RSA-like
-             confidence: 0.95,
-             signalQuality: 'excellent',
-             snr: 20,
-             motionLevel: 0,
-             hrv: { rmssd: 50, sdnn: 50, stressIndex: 80 }
+        this.startMockVitals(() => this.createSnapshot({
+            hr: 60 + Math.sin(Date.now() / 1000) * 5, // RSA-like
+            confidence: 0.95,
+            quality: 'excellent',
+            stressIndex: 80,
+            snr: 20
         }));
         this.log("Injecting: Coherent Bio-Signals", 'info');
 
         // 4. Run for 5 seconds (fast forward)
         await this.wait(5000);
-        
+
         // Assert: Phase Machine
         const p = this.kernel!.getState().phase;
         if (p === 'inhale' || p === 'holdIn') {
-             this.log(`Phase transition verified (Current: ${p})`, 'pass');
+            this.log(`Phase transition verified (Current: ${p})`, 'pass');
         } else {
-             this.log(`Unexpected phase: ${p}`, 'fail');
+            this.log(`Unexpected phase: ${p}`, 'fail');
         }
 
         // 5. Clean Stop
         useSessionStore.getState().stopSession();
         await this.wait(500);
         if (this.kernel!.getState().status === 'HALTED' || this.kernel!.getState().status === 'IDLE') {
-             this.log("Kernel Halted Cleanly", 'pass');
+            this.log("Kernel Halted Cleanly", 'pass');
         } else {
-             throw new Error("Kernel failed to halt");
+            throw new Error("Kernel failed to halt");
         }
     }
 
     // --- SCENARIO 02: PANIC RESPONSE (Safety Lock) ---
     private async scenarioPanicResponse() {
         this.log("Initializing SCENARIO 02: TRAUMA RESPONSE", 'info');
-        
+
         useSessionStore.getState().startSession('4-7-8');
         await this.wait(1000);
 
         // 1. Inject "Panic" Data (HR 160, Low HRV)
         this.log("Injecting: PANIC SIGNAL (HR 160, SI 800)", 'info');
-        this.startMockVitals(() => ({
-             heartRate: 160,
-             confidence: 0.9,
-             signalQuality: 'good',
-             snr: 15,
-             motionLevel: 0.2,
-             hrv: { rmssd: 10, sdnn: 10, stressIndex: 800 }
+        this.startMockVitals(() => this.createSnapshot({
+            hr: 160,
+            confidence: 0.9,
+            quality: 'good',
+            stressIndex: 800,
+            snr: 15
         }));
 
         // 2. Force Belief Update in Kernel to reflect this immediately (bypass smoothers)
         this.kernel!.dispatch({
             type: 'BELIEF_UPDATE',
-            belief: { 
+            belief: {
                 ...this.kernel!.getState().belief,
                 prediction_error: 0.99, // CRITICAL ERROR
                 arousal: 1.0
@@ -155,10 +153,7 @@ export class Holodeck {
             timestamp: Date.now()
         });
 
-        // Wait for Safety Guard to trip (SafetyConfig.safety.minSessionSecBeforeEmergency = 10s usually, 
-        // but for test we assume Kernel reacts to events. 
-        // We simulate the kernel catching up or manually firing the guard event if needed for deterministic test)
-        
+        // Wait for Safety Guard to trip
         this.log("Simulating Safety Interdiction Event...", 'info');
         this.kernel!.dispatch({
             type: 'SAFETY_INTERDICTION',
@@ -169,13 +164,13 @@ export class Holodeck {
 
         await this.wait(500);
         const status = this.kernel!.getState().status;
-        
+
         if (status === 'SAFETY_LOCK') {
             this.log("System entered SAFETY_LOCK", 'pass');
         } else {
             this.log(`System failed to lock. Status: ${status}`, 'fail');
         }
-        
+
         useSessionStore.getState().stopSession();
     }
 
@@ -211,12 +206,51 @@ export class Holodeck {
     // --- UTILS ---
     private wait(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
-    private startMockVitals(generator: () => VitalSigns) {
+    private startMockVitals(generator: () => ZenVitalsSnapshot) {
         // Mock global hook that CameraVitalsEngine listens to
         (window as any).__ZENB_HOLODECK_VITALS__ = generator;
     }
 
     private stopSimulationEffects() {
         (window as any).__ZENB_HOLODECK_VITALS__ = null;
+    }
+
+    private createSnapshot(p: { hr: number, quality: SignalQuality, confidence: number, stressIndex: number, snr: number }): ZenVitalsSnapshot {
+        const now = Date.now();
+        const baseQuality: Metric<QualityReport> = {
+            value: {
+                facePresent: true,
+                motion: 0,
+                brightnessMean: 100,
+                brightnessStd: 10,
+                saturationRatio: 0,
+                fpsEstimated: 30,
+                fpsJitterMs: 0,
+                bufferSpanSec: 60,
+                snr: p.snr
+            },
+            confidence: p.confidence,
+            quality: p.quality,
+            reasons: [],
+            windowSec: 60,
+            updatedAtMs: now
+        };
+
+        const createMetric = <T>(val: T) => ({
+            value: val,
+            confidence: p.confidence,
+            quality: p.quality,
+            reasons: [],
+            windowSec: 60,
+            updatedAtMs: now
+        });
+
+        return {
+            quality: baseQuality,
+            hr: createMetric(p.hr),
+            rr: createMetric(15),
+            hrv: createMetric({ rmssd: 50, sdnn: 50, stressIndex: p.stressIndex }),
+            affect: createMetric({ valence: 0, arousal: 0, moodLabel: 'neutral' })
+        };
     }
 }

@@ -172,7 +172,7 @@ export class UKFStateEstimator {
   // --- PREDICTION STEP ---
 
   private predict(dt: number): void {
-    const n = 5;
+    // const n = 5;
 
     // 1. Generate sigma points
     const sigmas = this.generateSigmaPoints(this.x, this.P);
@@ -246,7 +246,7 @@ export class UKFStateEstimator {
     h: (x: Vector5) => number,
     R: number
   ): void {
-    const n = 5;
+    // const n = 5;
 
     // 1. Generate sigma points from predicted state
     const sigmas = this.generateSigmaPoints(this.x, this.P);
@@ -493,7 +493,7 @@ export class UKFStateEstimator {
   }
 
   private computePredictionError(): number {
-    const [A, _, V, Att, R] = this.x;
+    const [A, _, _V, _Att, R] = this.x;
     const error_arousal = Math.pow(A - this.target.arousal, 2);
     const error_rhythm = Math.pow(R - this.target.rhythm, 2);
     return Math.sqrt(0.5 * error_arousal + 0.5 * error_rhythm);

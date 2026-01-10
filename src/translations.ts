@@ -1,5 +1,5 @@
 
-import { BreathingType } from './types';
+
 
 export type Language = 'en' | 'vi';
 

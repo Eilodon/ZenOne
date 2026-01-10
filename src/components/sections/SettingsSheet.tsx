@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Volume2, VolumeX, Smartphone, SmartphoneNfc, Music, Check, Terminal, ShieldAlert, Sparkles, Key, ExternalLink, TestTube2 } from 'lucide-react';
 import clsx from 'clsx';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -20,7 +20,7 @@ const getAIStudio = () => (window as any).aistudio as {
 export function SettingsSheet() {
   const isSettingsOpen = useUIStore(s => s.isSettingsOpen);
   const setSettingsOpen = useUIStore(s => s.setSettingsOpen);
-  
+
   const userSettings = useSettingsStore(s => s.userSettings);
   const setLanguage = useSettingsStore(s => s.setLanguage);
   const toggleSound = useSettingsStore(s => s.toggleSound);
@@ -42,7 +42,7 @@ export function SettingsSheet() {
   useEffect(() => {
     const aiStudio = getAIStudio();
     if (isSettingsOpen && aiStudio) {
-        aiStudio.hasSelectedApiKey().then(setHasApiKey).catch(() => setHasApiKey(false));
+      aiStudio.hasSelectedApiKey().then(setHasApiKey).catch(() => setHasApiKey(false));
     }
   }, [isSettingsOpen]);
 
@@ -52,169 +52,169 @@ export function SettingsSheet() {
   const triggerHaptic = () => { if (userSettings.hapticEnabled) hapticTick(true, 'light'); };
 
   const handleCameraToggle = () => {
-      triggerHaptic();
-      if (!userSettings.cameraVitalsEnabled) {
-          setShowCameraPermission(true);
-      } else {
-          toggleCameraVitals();
-      }
+    triggerHaptic();
+    if (!userSettings.cameraVitalsEnabled) {
+      setShowCameraPermission(true);
+    } else {
+      toggleCameraVitals();
+    }
   };
 
   const confirmCameraPermission = () => { setShowCameraPermission(false); toggleCameraVitals(); };
   const denyCameraPermission = () => { setShowCameraPermission(false); };
 
   const handleResetLocks = () => {
-      triggerHaptic();
-      ['4-7-8', 'box', 'calm', 'coherence'].forEach(id => resetSafetyLock(id as BreathingType));
+    triggerHaptic();
+    ['4-7-8', 'box', 'calm', 'coherence'].forEach(id => resetSafetyLock(id as BreathingType));
   };
 
   const handleAiToggle = async () => {
-      triggerHaptic();
-      if (!userSettings.aiCoachEnabled) {
-          const aiStudio = getAIStudio();
-          if (aiStudio) {
-              const hasKey = await aiStudio.hasSelectedApiKey();
-              if (!hasKey) {
-                  try {
-                      await aiStudio.openSelectKey();
-                      setHasApiKey(true);
-                      toggleAiCoach();
-                  } catch (e) { console.error("API Key failed", e); }
-              } else {
-                  toggleAiCoach();
-              }
-          } else {
-              toggleAiCoach(); 
-          }
-      } else {
-          toggleAiCoach();
-      }
-  };
-  
-  const handleChangeKey = async () => {
-      triggerHaptic();
+    triggerHaptic();
+    if (!userSettings.aiCoachEnabled) {
       const aiStudio = getAIStudio();
       if (aiStudio) {
-          try { await aiStudio.openSelectKey(); setHasApiKey(true); if (!userSettings.aiCoachEnabled) toggleAiCoach(); } catch(e) {}
+        const hasKey = await aiStudio.hasSelectedApiKey();
+        if (!hasKey) {
+          try {
+            await aiStudio.openSelectKey();
+            setHasApiKey(true);
+            toggleAiCoach();
+          } catch (e) { console.error("API Key failed", e); }
+        } else {
+          toggleAiCoach();
+        }
+      } else {
+        toggleAiCoach();
       }
+    } else {
+      toggleAiCoach();
+    }
+  };
+
+  const handleChangeKey = async () => {
+    triggerHaptic();
+    const aiStudio = getAIStudio();
+    if (aiStudio) {
+      try { await aiStudio.openSelectKey(); setHasApiKey(true); if (!userSettings.aiCoachEnabled) toggleAiCoach(); } catch (e) { }
+    }
   };
 
   return (
     <>
       {showHolodeck && <HolodeckOverlay onClose={() => setShowHolodeck(false)} />}
       {showCameraPermission && <CameraPermissionModal onAllow={confirmCameraPermission} onDeny={denyCameraPermission} />}
-      
+
       <GestureBottomSheet
         open={isSettingsOpen}
         onClose={() => setSettingsOpen(false)}
         title={t.settings.header}
       >
-           <div className="space-y-10 pb-8">
-              <section>
-                  <div className="text-white/30 font-caps text-[9px] tracking-[0.2em] mb-4 flex items-center gap-2 pl-1">{t.settings.language}</div>
-                  <div className="grid grid-cols-2 gap-3">
-                      <button onClick={() => { triggerHaptic(); setLanguage('en'); }} className={clsx("p-4 rounded-2xl flex items-center justify-center gap-3 transition-all border", userSettings.language === 'en' ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/30")}>
-                         <span className="text-xl">🇬🇧</span><span className="text-xs font-medium tracking-wide">English</span>
+        <div className="space-y-10 pb-8">
+          <section>
+            <div className="text-white/30 font-caps text-[9px] tracking-[0.2em] mb-4 flex items-center gap-2 pl-1">{t.settings.language}</div>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => { triggerHaptic(); setLanguage('en'); }} className={clsx("p-4 rounded-2xl flex items-center justify-center gap-3 transition-all border", userSettings.language === 'en' ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/30")}>
+                <span className="text-xl">🇬🇧</span><span className="text-xs font-medium tracking-wide">English</span>
+              </button>
+              <button onClick={() => { triggerHaptic(); setLanguage('vi'); }} className={clsx("p-4 rounded-2xl flex items-center justify-center gap-3 transition-all border", userSettings.language === 'vi' ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/30")}>
+                <span className="text-xl">🇻🇳</span><span className="text-xs font-medium tracking-wide">Tiếng Việt</span>
+              </button>
+            </div>
+          </section>
+
+          <section>
+            <div className="text-white/30 font-caps text-[9px] tracking-[0.2em] mb-4 flex items-center gap-2 pl-1">{t.settings.immersion}</div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => { triggerHaptic(); toggleSound(); }} className={clsx("p-5 rounded-[1.5rem] flex flex-col items-center gap-3 transition-all border", userSettings.soundEnabled ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/30")}>
+                  {userSettings.soundEnabled ? <Volume2 size={24} strokeWidth={1} /> : <VolumeX size={24} strokeWidth={1} />}
+                  <span className="text-xs font-medium tracking-wide">{t.settings.sounds}</span>
+                </button>
+                <button onClick={() => { triggerHaptic(); toggleHaptic(); }} className={clsx("p-5 rounded-[1.5rem] flex flex-col items-center gap-3 transition-all border", userSettings.hapticEnabled ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/30")}>
+                  {userSettings.hapticEnabled ? <Smartphone size={24} strokeWidth={1} /> : <SmartphoneNfc size={24} strokeWidth={1} />}
+                  <span className="text-xs font-medium tracking-wide">{t.settings.haptics}</span>
+                </button>
+              </div>
+
+              {userSettings.soundEnabled && (
+                <div className="bg-white/[0.02] rounded-[1.5rem] border border-white/5 p-5">
+                  <div className="text-[9px] text-white/40 uppercase font-bold mb-4 tracking-[0.2em] flex items-center gap-2"><Music size={12} /> {t.settings.soundPack}</div>
+                  <div className="grid grid-cols-1 gap-1">
+                    {soundPacks.map(pack => (
+                      <button key={pack} onClick={() => { triggerHaptic(); setSoundPack(pack); }} className={clsx("w-full text-left px-4 py-3.5 rounded-xl text-xs font-medium tracking-wide transition-all flex items-center justify-between group", userSettings.soundPack === pack ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:bg-white/5 hover:text-white")}>
+                        {t.settings.soundPacks[pack]}{userSettings.soundPack === pack && <Check size={14} />}
                       </button>
-                      <button onClick={() => { triggerHaptic(); setLanguage('vi'); }} className={clsx("p-4 rounded-2xl flex items-center justify-center gap-3 transition-all border", userSettings.language === 'vi' ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/30")}>
-                         <span className="text-xl">🇻🇳</span><span className="text-xs font-medium tracking-wide">Tiếng Việt</span>
-                      </button>
+                    ))}
                   </div>
-              </section>
+                </div>
+              )}
+            </div>
+          </section>
 
-              <section>
-                  <div className="text-white/30 font-caps text-[9px] tracking-[0.2em] mb-4 flex items-center gap-2 pl-1">{t.settings.immersion}</div>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                        <button onClick={() => { triggerHaptic(); toggleSound(); }} className={clsx("p-5 rounded-[1.5rem] flex flex-col items-center gap-3 transition-all border", userSettings.soundEnabled ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/30")}>
-                            {userSettings.soundEnabled ? <Volume2 size={24} strokeWidth={1} /> : <VolumeX size={24} strokeWidth={1} />}
-                            <span className="text-xs font-medium tracking-wide">{t.settings.sounds}</span>
-                        </button>
-                        <button onClick={() => { triggerHaptic(); toggleHaptic(); }} className={clsx("p-5 rounded-[1.5rem] flex flex-col items-center gap-3 transition-all border", userSettings.hapticEnabled ? "bg-white/10 border-white/20 text-white" : "bg-transparent border-white/5 text-white/30")}>
-                            {userSettings.hapticEnabled ? <Smartphone size={24} strokeWidth={1} /> : <SmartphoneNfc size={24} strokeWidth={1} />}
-                            <span className="text-xs font-medium tracking-wide">{t.settings.haptics}</span>
-                        </button>
-                    </div>
+          <section>
+            <div className="text-white/30 font-caps text-[9px] tracking-[0.2em] mb-4 flex items-center gap-2 pl-1">{t.settings.visuals}</div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-5 bg-white/[0.02] rounded-[1.5rem] border border-white/5">
+                <span className="text-sm font-light text-white/80">{t.settings.graphics}</span>
+                <select value={userSettings.quality} onChange={(e) => setQuality(e.target.value as any)} className="bg-black/40 text-white text-xs py-2 px-4 rounded-lg border border-white/10 outline-none focus:border-white/30 appearance-none font-mono">
+                  <option value="auto">{t.settings.quality.auto}</option>
+                  <option value="low">{t.settings.quality.low}</option>
+                  <option value="medium">{t.settings.quality.medium}</option>
+                  <option value="high">{t.settings.quality.high}</option>
+                </select>
+              </div>
+              <label className="flex items-center justify-between p-5 bg-white/[0.02] rounded-[1.5rem] border border-white/5 cursor-pointer hover:bg-white/[0.04] transition-colors">
+                <span className="text-sm font-light text-white/80">{t.settings.reduceMotion}</span>
+                <div className={clsx("w-11 h-6 rounded-full relative transition-colors border border-white/10", userSettings.reduceMotion ? "bg-white" : "bg-white/10")}>
+                  <input type="checkbox" checked={userSettings.reduceMotion} onChange={(e) => { triggerHaptic(); setReduceMotion(e.target.checked); }} className="sr-only" />
+                  <div className={clsx("absolute top-1 left-1 w-4 h-4 rounded-full shadow-sm transition-transform", userSettings.reduceMotion ? "bg-black translate-x-5" : "bg-white/50 translate-x-0")} />
+                </div>
+              </label>
+              <label className="flex items-center justify-between p-5 bg-white/[0.02] rounded-[1.5rem] border border-white/5 cursor-pointer hover:bg-white/[0.04] transition-colors">
+                <span className="text-sm font-light text-white/80">{t.settings.showTimer}</span>
+                <div className={clsx("w-11 h-6 rounded-full relative transition-colors border border-white/10", userSettings.showTimer ? "bg-white" : "bg-white/10")}>
+                  <input type="checkbox" checked={userSettings.showTimer} onChange={(_e) => { triggerHaptic(); toggleTimer(); }} className="sr-only" />
+                  <div className={clsx("absolute top-1 left-1 w-4 h-4 rounded-full shadow-sm transition-transform", userSettings.showTimer ? "bg-black translate-x-5" : "bg-white/50 translate-x-0")} />
+                </div>
+              </label>
+              <label className="flex items-center justify-between p-5 bg-white/[0.02] rounded-[1.5rem] border border-white/5 cursor-pointer hover:bg-white/[0.04] transition-colors">
+                <div><div className="text-sm font-light text-white/80">Bio-Sensors (Camera)</div><div className="text-xs text-white/40 mt-1">Adaptive Control</div></div>
+                <div className={clsx("w-11 h-6 rounded-full relative transition-colors border border-white/10", userSettings.cameraVitalsEnabled ? "bg-white" : "bg-white/10")}>
+                  <input type="checkbox" checked={userSettings.cameraVitalsEnabled} onChange={handleCameraToggle} className="sr-only" />
+                  <div className={clsx("absolute top-1 left-1 w-4 h-4 rounded-full shadow-sm transition-transform", userSettings.cameraVitalsEnabled ? "bg-black translate-x-5" : "bg-white/50 translate-x-0")} />
+                </div>
+              </label>
+            </div>
+          </section>
 
-                    {userSettings.soundEnabled && (
-                      <div className="bg-white/[0.02] rounded-[1.5rem] border border-white/5 p-5">
-                        <div className="text-[9px] text-white/40 uppercase font-bold mb-4 tracking-[0.2em] flex items-center gap-2"><Music size={12} /> {t.settings.soundPack}</div>
-                        <div className="grid grid-cols-1 gap-1">
-                          {soundPacks.map(pack => (
-                            <button key={pack} onClick={() => { triggerHaptic(); setSoundPack(pack); }} className={clsx("w-full text-left px-4 py-3.5 rounded-xl text-xs font-medium tracking-wide transition-all flex items-center justify-between group", userSettings.soundPack === pack ? "bg-white/10 text-white shadow-sm" : "text-white/40 hover:bg-white/5 hover:text-white")}>
-                              {t.settings.soundPacks[pack]}{userSettings.soundPack === pack && <Check size={14} />}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+          <section>
+            <div className="text-white/30 font-caps text-[9px] tracking-[0.2em] mb-4 flex items-center gap-2 pl-1">Advanced Intelligence</div>
+            <div className="space-y-3">
+              <label className="flex items-center justify-between p-5 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-[1.5rem] border border-white/10 cursor-pointer hover:border-white/20 transition-colors">
+                <div>
+                  <div className="text-sm font-bold text-white flex items-center gap-2"><Sparkles size={14} className="text-purple-400" />Gemini Neuro-Somatic AI</div>
+                  <div className="text-[10px] text-white/50 mt-1 max-w-[200px]">Real-time voice coaching & adaptive protocol generation.</div>
+                  <div className="flex gap-2 mt-2">
+                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[9px] text-white/30 hover:text-white/60" onClick={(e) => e.stopPropagation()}>Pricing Info <ExternalLink size={8} /></a>
                   </div>
-              </section>
+                </div>
+                <div className={clsx("w-11 h-6 rounded-full relative transition-colors border border-white/10", userSettings.aiCoachEnabled ? "bg-purple-500" : "bg-white/10")}>
+                  <input type="checkbox" checked={userSettings.aiCoachEnabled} onChange={handleAiToggle} className="sr-only" />
+                  <div className={clsx("absolute top-1 left-1 w-4 h-4 rounded-full shadow-sm transition-transform bg-white", userSettings.aiCoachEnabled ? "translate-x-5" : "translate-x-0")} />
+                </div>
+              </label>
 
-              <section>
-                  <div className="text-white/30 font-caps text-[9px] tracking-[0.2em] mb-4 flex items-center gap-2 pl-1">{t.settings.visuals}</div>
-                  <div className="space-y-3">
-                      <div className="flex items-center justify-between p-5 bg-white/[0.02] rounded-[1.5rem] border border-white/5">
-                          <span className="text-sm font-light text-white/80">{t.settings.graphics}</span>
-                          <select value={userSettings.quality} onChange={(e) => setQuality(e.target.value as any)} className="bg-black/40 text-white text-xs py-2 px-4 rounded-lg border border-white/10 outline-none focus:border-white/30 appearance-none font-mono">
-                              <option value="auto">{t.settings.quality.auto}</option>
-                              <option value="low">{t.settings.quality.low}</option>
-                              <option value="medium">{t.settings.quality.medium}</option>
-                              <option value="high">{t.settings.quality.high}</option>
-                          </select>
-                      </div>
-                      <label className="flex items-center justify-between p-5 bg-white/[0.02] rounded-[1.5rem] border border-white/5 cursor-pointer hover:bg-white/[0.04] transition-colors">
-                          <span className="text-sm font-light text-white/80">{t.settings.reduceMotion}</span>
-                          <div className={clsx("w-11 h-6 rounded-full relative transition-colors border border-white/10", userSettings.reduceMotion ? "bg-white" : "bg-white/10")}>
-                              <input type="checkbox" checked={userSettings.reduceMotion} onChange={(e) => { triggerHaptic(); setReduceMotion(e.target.checked); }} className="sr-only"/>
-                              <div className={clsx("absolute top-1 left-1 w-4 h-4 rounded-full shadow-sm transition-transform", userSettings.reduceMotion ? "bg-black translate-x-5" : "bg-white/50 translate-x-0")} />
-                          </div>
-                      </label>
-                      <label className="flex items-center justify-between p-5 bg-white/[0.02] rounded-[1.5rem] border border-white/5 cursor-pointer hover:bg-white/[0.04] transition-colors">
-                          <span className="text-sm font-light text-white/80">{t.settings.showTimer}</span>
-                          <div className={clsx("w-11 h-6 rounded-full relative transition-colors border border-white/10", userSettings.showTimer ? "bg-white" : "bg-white/10")}>
-                              <input type="checkbox" checked={userSettings.showTimer} onChange={(e) => { triggerHaptic(); toggleTimer(); }} className="sr-only"/>
-                              <div className={clsx("absolute top-1 left-1 w-4 h-4 rounded-full shadow-sm transition-transform", userSettings.showTimer ? "bg-black translate-x-5" : "bg-white/50 translate-x-0")} />
-                          </div>
-                      </label>
-                      <label className="flex items-center justify-between p-5 bg-white/[0.02] rounded-[1.5rem] border border-white/5 cursor-pointer hover:bg-white/[0.04] transition-colors">
-                        <div><div className="text-sm font-light text-white/80">Bio-Sensors (Camera)</div><div className="text-xs text-white/40 mt-1">Adaptive Control</div></div>
-                        <div className={clsx("w-11 h-6 rounded-full relative transition-colors border border-white/10", userSettings.cameraVitalsEnabled ? "bg-white" : "bg-white/10")}>
-                          <input type="checkbox" checked={userSettings.cameraVitalsEnabled} onChange={handleCameraToggle} className="sr-only"/>
-                          <div className={clsx("absolute top-1 left-1 w-4 h-4 rounded-full shadow-sm transition-transform", userSettings.cameraVitalsEnabled ? "bg-black translate-x-5" : "bg-white/50 translate-x-0")} />
-                        </div>
-                      </label>
-                  </div>
-              </section>
+              <button onClick={handleChangeKey} className="w-full p-4 bg-white/5 rounded-xl flex items-center gap-3 text-white/60 hover:text-white hover:bg-white/10 transition-colors"><Key size={16} /><span className="text-xs font-mono">{hasApiKey ? "Change API Key" : "Select API Key"}</span></button>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => { triggerHaptic(); toggleKernelMonitor(); setSettingsOpen(false); }} className="p-4 bg-white/5 rounded-xl flex items-center gap-3 text-white/60 hover:text-white hover:bg-white/10 transition-colors"><Terminal size={16} /><span className="text-xs font-mono">Kernel Monitor</span></button>
+                <button onClick={() => { triggerHaptic(); setShowHolodeck(true); }} className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-center gap-3 text-purple-300 hover:text-white hover:bg-purple-500/20 transition-colors"><TestTube2 size={16} /><span className="text-xs font-mono">Run Holodeck</span></button>
+              </div>
+              <button onClick={handleResetLocks} className="w-full p-4 bg-white/5 rounded-xl flex items-center gap-3 text-white/60 hover:text-red-300 hover:bg-red-500/10 transition-colors group"><ShieldAlert size={16} className="group-hover:text-red-400" /><span className="text-xs font-mono">Reset Safety Locks</span></button>
+            </div>
+          </section>
 
-              <section>
-                   <div className="text-white/30 font-caps text-[9px] tracking-[0.2em] mb-4 flex items-center gap-2 pl-1">Advanced Intelligence</div>
-                  <div className="space-y-3">
-                     <label className="flex items-center justify-between p-5 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-[1.5rem] border border-white/10 cursor-pointer hover:border-white/20 transition-colors">
-                        <div>
-                          <div className="text-sm font-bold text-white flex items-center gap-2"><Sparkles size={14} className="text-purple-400" />Gemini Neuro-Somatic AI</div>
-                          <div className="text-[10px] text-white/50 mt-1 max-w-[200px]">Real-time voice coaching & adaptive protocol generation.</div>
-                          <div className="flex gap-2 mt-2">
-                             <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="flex items-center gap-1 text-[9px] text-white/30 hover:text-white/60" onClick={(e) => e.stopPropagation()}>Pricing Info <ExternalLink size={8} /></a>
-                          </div>
-                        </div>
-                        <div className={clsx("w-11 h-6 rounded-full relative transition-colors border border-white/10", userSettings.aiCoachEnabled ? "bg-purple-500" : "bg-white/10")}>
-                          <input type="checkbox" checked={userSettings.aiCoachEnabled} onChange={handleAiToggle} className="sr-only"/>
-                          <div className={clsx("absolute top-1 left-1 w-4 h-4 rounded-full shadow-sm transition-transform bg-white", userSettings.aiCoachEnabled ? "translate-x-5" : "translate-x-0")} />
-                        </div>
-                      </label>
-                      
-                     <button onClick={handleChangeKey} className="w-full p-4 bg-white/5 rounded-xl flex items-center gap-3 text-white/60 hover:text-white hover:bg-white/10 transition-colors"><Key size={16} /><span className="text-xs font-mono">{hasApiKey ? "Change API Key" : "Select API Key"}</span></button>
-                     <div className="grid grid-cols-2 gap-3">
-                        <button onClick={() => { triggerHaptic(); toggleKernelMonitor(); setSettingsOpen(false); }} className="p-4 bg-white/5 rounded-xl flex items-center gap-3 text-white/60 hover:text-white hover:bg-white/10 transition-colors"><Terminal size={16} /><span className="text-xs font-mono">Kernel Monitor</span></button>
-                        <button onClick={() => { triggerHaptic(); setShowHolodeck(true); }} className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-center gap-3 text-purple-300 hover:text-white hover:bg-purple-500/20 transition-colors"><TestTube2 size={16} /><span className="text-xs font-mono">Run Holodeck</span></button>
-                     </div>
-                    <button onClick={handleResetLocks} className="w-full p-4 bg-white/5 rounded-xl flex items-center gap-3 text-white/60 hover:text-red-300 hover:bg-red-500/10 transition-colors group"><ShieldAlert size={16} className="group-hover:text-red-400"/><span className="text-xs font-mono">Reset Safety Locks</span></button>
-                  </div>
-              </section>
-              
-              <div className="pt-8 text-center"><div className="text-[10px] text-white/20 font-mono">ZenB Kernel v6.5 (Holodeck Enabled)</div></div>
-           </div>
+          <div className="pt-8 text-center"><div className="text-[10px] text-white/20 font-mono">ZenB Kernel v6.5 (Holodeck Enabled)</div></div>
+        </div>
       </GestureBottomSheet>
     </>
   );

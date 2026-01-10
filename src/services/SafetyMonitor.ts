@@ -100,7 +100,7 @@ export const SAFETY_SPECS: LTLFormula[] = [
       operator: 'ATOMIC',
       name: 'check_pattern_stability',
       description: 'Check last pattern change',
-      predicate: (state, event, trace) => {
+      predicate: (_state, event, trace) => {
         if (event?.type === 'LOAD_PROTOCOL') {
           // Find last LOAD_PROTOCOL in trace
           const lastLoad = trace.slice().reverse().find(e => e.type === 'LOAD_PROTOCOL');

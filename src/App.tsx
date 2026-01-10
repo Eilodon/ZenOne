@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSessionStore } from './stores/sessionStore';
 import { useSettingsStore } from './stores/settingsStore';
 import { useUIStore } from './stores/uiStore';
@@ -27,7 +27,7 @@ export default function App() {
   const phase = useSessionStore(s => s.phase);
   const currentPattern = useSessionStore(s => s.currentPattern);
   const lastSessionStats = useSessionStore(s => s.lastSessionStats);
-  
+
   const userSettings = useSettingsStore(s => s.userSettings);
   const hasSeenOnboarding = useSettingsStore(s => s.hasSeenOnboarding);
   const completeOnboarding = useSettingsStore(s => s.completeOnboarding);
@@ -41,12 +41,12 @@ export default function App() {
   // Core Engine (Biological OS Driver) - VIA SINGLETON CONTEXT
   const { progressRef, entropyRef } = useEngine();
   const kernel = useKernel();
-  
+
   // v6.1: Subscribe to AI Status via Kernel Hook
   const aiStatus = useKernelState(s => s.aiStatus);
-  
+
   const [selectedPatternId, setSelectedPatternId] = useState<BreathingType>(userSettings.lastUsedPattern || '4-7-8');
-  
+
   useEffect(() => {
     setSelectedPatternId(userSettings.lastUsedPattern);
   }, [userSettings.lastUsedPattern]);
@@ -58,18 +58,18 @@ export default function App() {
   // --- GEMINI SOMATIC BRIDGE LIFECYCLE ---
   useEffect(() => {
     if (userSettings.aiCoachEnabled && isActive && !bridgeRef.current) {
-        bridgeRef.current = new GeminiSomaticBridge(kernel);
-        bridgeRef.current.connect();
+      bridgeRef.current = new GeminiSomaticBridge(kernel);
+      bridgeRef.current.connect();
     } else if ((!userSettings.aiCoachEnabled || !isActive) && bridgeRef.current) {
+      bridgeRef.current.disconnect();
+      bridgeRef.current = null;
+    }
+
+    return () => {
+      if (bridgeRef.current) {
         bridgeRef.current.disconnect();
         bridgeRef.current = null;
-    }
-    
-    return () => {
-        if (bridgeRef.current) {
-            bridgeRef.current.disconnect();
-            bridgeRef.current = null;
-        }
+      }
     };
   }, [userSettings.aiCoachEnabled, isActive, kernel]);
 
@@ -89,35 +89,35 @@ export default function App() {
     let lastTap = 0;
 
     const handleTap = (e: MouseEvent | TouchEvent) => {
-        // Audio Unlock
-        unlockAudio();
+      // Audio Unlock
+      unlockAudio();
 
-        // Secret 5-tap top-right corner to toggle Kernel Monitor
-        const x = 'clientX' in e ? e.clientX : e.touches[0].clientX;
-        const y = 'clientY' in e ? e.clientY : e.touches[0].clientY;
-        const w = window.innerWidth;
-        
-        if (x > w - 100 && y < 100) {
-            const now = Date.now();
-            if (now - lastTap < 500) {
-                tapCount++;
-            } else {
-                tapCount = 1;
-            }
-            lastTap = now;
-            
-            if (tapCount === 5) {
-                toggleKernelMonitor();
-                tapCount = 0;
-            }
+      // Secret 5-tap top-right corner to toggle Kernel Monitor
+      const x = 'clientX' in e ? e.clientX : e.touches[0].clientX;
+      const y = 'clientY' in e ? e.clientY : e.touches[0].clientY;
+      const w = window.innerWidth;
+
+      if (x > w - 100 && y < 100) {
+        const now = Date.now();
+        if (now - lastTap < 500) {
+          tapCount++;
+        } else {
+          tapCount = 1;
         }
+        lastTap = now;
+
+        if (tapCount === 5) {
+          toggleKernelMonitor();
+          tapCount = 0;
+        }
+      }
     };
 
     window.addEventListener('click', handleTap);
     window.addEventListener('touchstart', handleTap);
     return () => {
-        window.removeEventListener('click', handleTap);
-        window.removeEventListener('touchstart', handleTap);
+      window.removeEventListener('click', handleTap);
+      window.removeEventListener('touchstart', handleTap);
     };
   }, [toggleKernelMonitor]);
 
@@ -131,7 +131,7 @@ export default function App() {
     const requestWakeLock = async () => {
       if (!isActive || isPaused) {
         if (wakeLockRef.current) {
-          wakeLockRef.current.release().catch(() => {});
+          wakeLockRef.current.release().catch(() => { });
           wakeLockRef.current = null;
         }
         return;
@@ -157,22 +157,22 @@ export default function App() {
         requestWakeLock();
       } else {
         if (wakeLockRef.current) {
-          wakeLockRef.current.release().catch(() => {});
+          wakeLockRef.current.release().catch(() => { });
           wakeLockRef.current = null;
         }
       }
     };
-    
+
     document.addEventListener('visibilitychange', handleVis);
     return () => {
       document.removeEventListener('visibilitychange', handleVis);
-      if (wakeLockRef.current) wakeLockRef.current.release().catch(() => {});
+      if (wakeLockRef.current) wakeLockRef.current.release().catch(() => { });
     };
   }, [isActive, isPaused]);
 
   return (
     <div className="relative w-full min-h-dvh overflow-hidden bg-surface text-txt selection:bg-white/20 font-sans">
-      
+
       {/* ---------------- LAYER 0: VISUAL CORTEX ---------------- */}
       <div className="absolute inset-0 z-0 flex items-center justify-center">
         <OrbBreathViz
@@ -188,44 +188,44 @@ export default function App() {
       </div>
 
       {/* ---------------- LAYER 1: UI ORCHESTRATION ---------------- */}
-      
+
       <Header />
-      
+
       <ActiveSessionDisplay />
-      
-      <Footer 
-        selectedPatternId={selectedPatternId} 
-        setSelectedPatternId={setSelectedPatternId} 
+
+      <Footer
+        selectedPatternId={selectedPatternId}
+        setSelectedPatternId={setSelectedPatternId}
       />
 
       {/* ---------------- OVERLAYS ---------------- */}
-      
+
       {!hasSeenOnboarding && <OnboardingModal onComplete={completeOnboarding} t={t} />}
-      
+
       {showSummary && lastSessionStats && (
-        <SummaryModal 
-            stats={lastSessionStats} 
-            onClose={handleCloseSummary} 
-            t={t} 
-            streak={userSettings.streak} 
-            language={userSettings.language}
+        <SummaryModal
+          stats={lastSessionStats}
+          onClose={handleCloseSummary}
+          t={t}
+          streak={userSettings.streak}
+          language={userSettings.language}
         />
       )}
 
       {userSettings.showKernelMonitor && <KernelMonitor onClose={toggleKernelMonitor} />}
-      
+
       {snackbar && (
-          <KineticSnackbar 
-             key={snackbar.id}
-             text={snackbar.text}
-             kind={snackbar.kind}
-             onClose={hideSnackbar}
-          />
+        <KineticSnackbar
+          key={snackbar.id}
+          text={snackbar.text}
+          kind={snackbar.kind}
+          onClose={hideSnackbar}
+        />
       )}
 
       <HistorySheet />
       <SettingsSheet />
-      
+
     </div>
   );
 }

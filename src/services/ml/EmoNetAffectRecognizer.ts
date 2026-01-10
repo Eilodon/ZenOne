@@ -16,7 +16,7 @@ export class EmoNetAffectRecognizer {
         return true;
     }
 
-    predict(keypoints: Keypoint[]): VADOutput | null {
+    predict(_keypoints: Keypoint[]): VADOutput | null {
         if (!this.isReady) return null;
 
         // Mock inference

@@ -36,7 +36,7 @@
  * - Prometheus naming conventions
  */
 
-import type { KernelEvent, BeliefState } from '../types';
+import type { KernelEvent } from '../types';
 import type { RuntimeState } from './PureZenBKernel';
 
 // ========== TYPES ==========

@@ -1,5 +1,5 @@
 
-import { Observation, BreathPattern, BeliefState, BREATHING_PATTERNS } from '../types';
+import { Observation, BreathPattern, BeliefState } from '../types';
 
 /**
  * ADAPTIVE STATE ESTIMATOR v6.5 (DEAD RECKONING)
@@ -10,19 +10,19 @@ import { Observation, BreathPattern, BeliefState, BREATHING_PATTERNS } from '../
  */
 
 export interface EstimatorConfig {
-    alpha?: number;             
-    adaptive_r?: boolean;       
-    r_adaptation_rate?: number; 
-    q_base?: number;            
-    r_base?: number;            
-    outlier_threshold?: number; 
+    alpha?: number;
+    adaptive_r?: boolean;
+    r_adaptation_rate?: number;
+    q_base?: number;
+    r_base?: number;
+    outlier_threshold?: number;
 }
 
 interface TargetState {
-  arousal: number;
-  attention: number;
-  rhythm_alignment: number;
-  valence: number;
+    arousal: number;
+    attention: number;
+    rhythm_alignment: number;
+    valence: number;
 }
 
 const PROTOCOL_TARGETS: Record<string, TargetState> = {
@@ -51,9 +51,9 @@ export class AdaptiveStateEstimator {
     private target: TargetState;
     private config: Required<EstimatorConfig>;
 
-    private readonly TAU_AROUSAL = 15.0; 
-    private readonly TAU_ATTENTION = 5.0; 
-    private readonly TAU_RHYTHM = 10.0; 
+    private readonly TAU_AROUSAL = 15.0;
+    private readonly TAU_ATTENTION = 5.0;
+    private readonly TAU_RHYTHM = 10.0;
     private readonly TAU_VALENCE = 8.0;
 
     constructor(config: EstimatorConfig = {}) {
@@ -96,7 +96,7 @@ export class AdaptiveStateEstimator {
         // Even if sensors are dead, the model projects the state forward based on the protocol.
         // This is "The Hallucination" - assuming the user is following the guide.
         const predicted = this.predict(dt);
-        
+
         // 2. CORRECTION
         // If sensors are active, we correct the hallucination.
         const corrected = this.correct(predicted, obs, dt);
@@ -125,7 +125,7 @@ export class AdaptiveStateEstimator {
 
         // Process Noise (Uncertainty grows over time without observation)
         const Q = this.config.q_base * dt;
-        
+
         return {
             arousal: this.clamp(predicted_arousal),
             attention: this.clamp(predicted_attention),
@@ -150,22 +150,22 @@ export class AdaptiveStateEstimator {
         // ---- AROUSAL CORRECTION (Fused HR + Stress Index) ----
         if (obs.heart_rate !== undefined && obs.hr_confidence !== undefined && obs.hr_confidence > 0.3) {
             let measured_arousal = (obs.heart_rate - 50) / 70;
-            
+
             if (obs.stress_index !== undefined) {
-                 const stress_norm = Math.min(1, obs.stress_index / 300);
-                 measured_arousal = 0.6 * measured_arousal + 0.4 * stress_norm;
+                const stress_norm = Math.min(1, obs.stress_index / 300);
+                measured_arousal = 0.6 * measured_arousal + 0.4 * stress_norm;
             }
             measured_arousal = this.clamp(measured_arousal);
-            
+
             let R = this.config.r_base;
             if (this.config.adaptive_r) {
                 const confidencePenalty = (1 - obs.hr_confidence) * this.config.r_adaptation_rate;
                 R += confidencePenalty;
             }
 
-            const S = predicted.arousal_variance + R; 
+            const S = predicted.arousal_variance + R;
             const K_arousal = predicted.arousal_variance / S;
-            
+
             const innovation = measured_arousal - predicted.arousal;
             mahalanobis = Math.sqrt((innovation * innovation) / S);
 
@@ -176,7 +176,7 @@ export class AdaptiveStateEstimator {
                 currentInnovation = innovation;
             } else {
                 // Outlier detected: Slightly increase variance but trust model over sensor
-                corrected.arousal_variance += 0.01; 
+                corrected.arousal_variance += 0.01;
             }
         } else {
             // No Sensor Data: We trust the Prediction (Dead Reckoning)
@@ -189,11 +189,11 @@ export class AdaptiveStateEstimator {
         }
 
         const isDistracted = obs.user_interaction === 'pause' || obs.visibilty_state === 'hidden';
-        
+
         if (isDistracted) {
-             corrected.attention = predicted.attention * 0.95;
+            corrected.attention = predicted.attention * 0.95;
         } else {
-             corrected.attention = Math.min(1, corrected.attention + 0.15 * dt);
+            corrected.attention = Math.min(1, corrected.attention + 0.15 * dt);
         }
 
         return {
@@ -217,7 +217,7 @@ export class AdaptiveStateEstimator {
         // Confidence is a mix of Model Certainty (Low Variance) and Sensor Quality
         const model_certainty = 1 - Math.min(1, (state.arousal_variance + state.attention_variance) / 2);
         const sensor_quality = obs.hr_confidence ?? 0.0; // If no sensor, quality is 0
-        
+
         // In Dead Reckoning, sensor_quality is 0, but model_certainty might be high.
         // We allow confidence to decay slowly rather than drop to zero.
         return this.clamp(0.7 * model_certainty + 0.3 * sensor_quality);

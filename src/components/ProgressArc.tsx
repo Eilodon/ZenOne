@@ -1,10 +1,10 @@
 
-import React from 'react';
+import type { Ref } from 'react';
 
 type ProgressArcProps = {
   size?: number;
   stroke?: number;
-  circleRef: React.RefObject<SVGCircleElement | null>;
+  circleRef: Ref<SVGCircleElement>;
 };
 
 // A minimal, glowing progress arc - Zen Masterpiece Version
@@ -32,7 +32,7 @@ export const ProgressArc = ({ size = 200, stroke = 1, circleRef }: ProgressArcPr
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={circumference}
-          strokeDashoffset={circumference} 
+          strokeDashoffset={circumference}
           r={radius}
           cx={size / 2}
           cy={size / 2}
@@ -47,12 +47,12 @@ export const ProgressArc = ({ size = 200, stroke = 1, circleRef }: ProgressArcPr
           </linearGradient>
           <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
             {/* Double blur for 'Bloom' effect on SVG */}
-            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-            <feGaussianBlur stdDeviation="4" result="coloredBlur2"/>
+            <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+            <feGaussianBlur stdDeviation="4" result="coloredBlur2" />
             <feMerge>
-                <feMergeNode in="coloredBlur2"/>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
+              <feMergeNode in="coloredBlur2" />
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
         </defs>

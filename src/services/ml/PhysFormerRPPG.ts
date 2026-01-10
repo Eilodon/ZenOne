@@ -1,5 +1,5 @@
 
-import * as tf from '@tensorflow/tfjs';
+// import * as tf from '@tensorflow/tfjs';
 // Using ONNX Runtime Web if available, else stub or TFJS
 // For now, we assume we might load a custom TFJS model or ONNX via a wrapper
 // Since spec said ONNX/WebNN, we'll architect this to use a standard interface
@@ -12,9 +12,9 @@ export interface RPPGResult {
 
 export class PhysFormerRPPG {
     private isReady = false;
-    private model: any = null;
-    private frameBuffer: number[] = [];
-    private readonly WINDOW_SIZE = 128; // PhysFormer usually takes 128 frames
+    // private _model: any = null;
+    // private _frameBuffer: number[] = [];
+    // private readonly _WINDOW_SIZE = 128; // PhysFormer usually takes 128 frames
 
     async loadModel(): Promise<boolean> {
         try {
@@ -30,7 +30,7 @@ export class PhysFormerRPPG {
         }
     }
 
-    processFrame(rgb: { r: number, g: number, b: number }, timestamp: number): RPPGResult | null {
+    processFrame(_rgb: { r: number, g: number, b: number }, _timestamp: number): RPPGResult | null {
         if (!this.isReady) return null;
 
         // Add to sliding window

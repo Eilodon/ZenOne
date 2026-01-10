@@ -1,7 +1,6 @@
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SafetyMonitor, SAFETY_SPECS } from './SafetyMonitor';
-import { RuntimeState } from './PureZenBKernel';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SafetyMonitor } from './SafetyMonitor';
 import { KernelEvent, BeliefState } from '../types';
 
 describe('SafetyMonitor (Formal Verification)', () => {
@@ -38,7 +37,7 @@ describe('SafetyMonitor (Formal Verification)', () => {
         expect(result.correctedEvent).toBeDefined();
         // Should be clamped to max 1.4 allowed by LTL
         if (result.correctedEvent && result.correctedEvent.type === 'ADJUST_TEMPO') {
-            expect(result.correctedEvent.scale).toBeCloseTo(1.4, 1); // Clamp to max 1.4 (from LTL) or rate limit logic
+            // expect(result.correctedEvent.scale).toBeCloseTo(1.4, 1); // Removed: Rate limit of 0.1 takes precedence over 1.4 bound
             // Wait, the rate limit is 0.1/sec. Delta t = 1s. Max change = 0.1. 
             // Current 1.0. Max 1.1. So it should actually be clamped to 1.1!
             expect(result.correctedEvent.scale).toBeCloseTo(1.1, 1);

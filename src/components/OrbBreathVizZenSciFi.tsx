@@ -1,10 +1,11 @@
 
-import React, { useMemo, useRef } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import React, { useMemo, useRef, useEffect } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { BreathPhase, ColorTheme, QualityTier } from '../types';
 import { AIConnectionStatus } from '../services/PureZenBKernel';
+import { setSpatialBreathParams } from '../services/audio'; // [NEW] Spatial Audio Sync
 
 type Props = {
   phase: BreathPhase;
@@ -14,9 +15,9 @@ type Props = {
   isActive: boolean;
   progressRef: React.MutableRefObject<number>;
   entropyRef?: React.MutableRefObject<number>;
-  aiStatus?: AIConnectionStatus; // v6.1 Visual Feedback
+  aiStatus?: AIConnectionStatus;
 };
-
+// ... THEMES definition (preserved) ...
 const THEMES: Record<ColorTheme, { deep: THREE.Color; mid: THREE.Color; glow: THREE.Color; accent: THREE.Color }> = {
   warm: {
     deep: new THREE.Color('#2b0505'),
@@ -42,14 +43,17 @@ function resolveTier(q: QualityTier) {
   const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
   const cores = typeof navigator !== 'undefined' ? (navigator.hardwareConcurrency || 4) : 4;
   const auto = q === 'auto';
-  const isLow = q === 'low' || (auto && cores <= 4);
+  // If cores < 4, it's very low end. < 8 is mid. >= 8 is high/desktop.
+  const isLow = q === 'low' || (auto && cores < 4);
   const isHigh = q === 'high' || (auto && cores >= 8);
 
-  if (isLow) return { dpr: Math.min(dpr, 1.25), seg: 28, halo: false, ring: false };
-  if (isHigh) return { dpr: Math.min(dpr, 2), seg: 64, halo: true, ring: true };
-  return { dpr: Math.min(dpr, 1.5), seg: 44, halo: true, ring: false };
+  // octaves: Complexity of FBM noise. 4 is standard, 2 for low end.
+  if (isLow) return { dpr: Math.min(dpr, 1.0), seg: 24, halo: false, ring: false, octaves: 2 };
+  if (isHigh) return { dpr: Math.min(dpr, 2), seg: 64, halo: true, ring: true, octaves: 4 };
+  return { dpr: Math.min(dpr, 1.5), seg: 40, halo: true, ring: false, octaves: 3 };
 }
 
+// ... CORE_VERT (preserved) ...
 const CORE_VERT = `
 varying vec3 vPos;
 varying vec3 vNormal;
@@ -71,7 +75,8 @@ void main() {
 }
 `;
 
-const CORE_FRAG = `
+// Inject octaves into fragment shader
+const getFragShader = (octaves: number) => `
 precision highp float;
 varying vec3 vPos;
 varying vec3 vNormal;
@@ -82,7 +87,7 @@ uniform vec3 uDeep;
 uniform vec3 uMid;
 uniform vec3 uGlow;
 uniform vec3 uAccent;
-uniform float uAiPulse; // New: AI Visual Presence
+uniform float uAiPulse; 
 
 float hash(vec3 p){
   p = fract(p * 0.3183099 + vec3(0.1, 0.2, 0.3));
@@ -114,7 +119,8 @@ float noise(vec3 p){
 float fbm(vec3 p){
   float v = 0.0;
   float a = 0.55;
-  for(int i=0;i<4;i++){
+  // Adaptive Octaves via JS Injection
+  for(int i=0;i<${octaves};i++){ 
     v += a * noise(p);
     p *= 2.02;
     a *= 0.5;
@@ -132,15 +138,11 @@ void main(){
   vec3 glow = mix(base, uGlow, clamp(uBreath, 0.0, 1.0) * 0.75);
   float shimmer = fbm(p * 2.2 + vec3(t*2.0)) * 0.5 + 0.5;
   
-  // AI Influence: If uAiPulse > 0, we override accent with a tech-glow (Emerald/Violet)
-  // When speaking (uAiPulse high), we shift to Violet. Thinking is Emerald.
   vec3 aiColor = mix(vec3(0.0, 1.0, 0.6), vec3(0.6, 0.2, 1.0), smoothstep(0.4, 1.0, uAiPulse)); 
   vec3 accent = mix(uAccent, aiColor, uAiPulse);
   
-  // Mix AI color into glow base as well
   glow = mix(glow, aiColor, uAiPulse * 0.6);
 
-  // Wireframe / Digital Glitch effect when AI is active
   if (uAiPulse > 0.05) {
      float grid = abs(sin(vPos.x * 20.0)) + abs(sin(vPos.y * 20.0));
      glow += aiColor * (1.0 - smoothstep(0.0, 0.1, grid)) * uAiPulse * 0.5;
@@ -160,6 +162,7 @@ function ZenOrb(props: Props) {
   const { phase, theme, quality, reduceMotion, isActive, progressRef, entropyRef, aiStatus } = props;
   const tier = useMemo(() => resolveTier(quality), [quality]);
   const colors = useMemo(() => THEMES[theme] ?? THEMES.neutral, [theme]);
+  const { gl } = useThree(); // Access WebGL Context
 
   const group = useRef<THREE.Group>(null);
   const shellMat = useRef<THREE.MeshPhysicalMaterial>(null);
@@ -169,8 +172,30 @@ function ZenOrb(props: Props) {
   const entropySmoothRef = useRef(0);
   const aiPulseRef = useRef(0);
 
+  // [NEW] WebGL Context Robustness
+  useEffect(() => {
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      console.warn("⚠️ WebGL Context Lost");
+      // Three.js usually handles auto-restore if we preventDefault,
+      // but we might need to reset some shader state if it comes back weird.
+    };
+    const handleContextRestored = () => {
+      console.log("✅ WebGL Context Restored");
+      if (coreMat.current) coreMat.current.needsUpdate = true;
+    };
+
+    gl.domElement.addEventListener('webglcontextlost', handleContextLost, false);
+    gl.domElement.addEventListener('webglcontextrestored', handleContextRestored, false);
+    return () => {
+      gl.domElement.removeEventListener('webglcontextlost', handleContextLost);
+      gl.domElement.removeEventListener('webglcontextrestored', handleContextRestored);
+    };
+  }, [gl]);
+
   useFrame((state, delta) => {
     const time = state.clock.getElapsedTime();
+
     const motion = reduceMotion ? 0.45 : 1.0;
     const p = THREE.MathUtils.clamp(progressRef.current, 0, 1);
 
@@ -183,7 +208,10 @@ function ZenOrb(props: Props) {
     } else {
       targetBreath = (Math.sin(time * 0.7) * 0.5 + 0.5) * 0.35;
     }
-    
+
+    // [NEW] Sync Spatial Audio
+    setSpatialBreathParams(breathRef.current);
+
     // AI Pulse Logic
     let targetAi = 0;
     if (aiStatus === 'speaking') targetAi = 0.9 + Math.sin(time * 15) * 0.2; // Rapid flutter + Voice
@@ -217,10 +245,10 @@ function ZenOrb(props: Props) {
       shellMat.current.thickness = THREE.MathUtils.lerp(0.3, 0.7, breath);
       shellMat.current.attenuationColor.copy(colors.deep);
       shellMat.current.attenuationDistance = THREE.MathUtils.lerp(1.8, 0.9, breath);
-      
+
       // Slight tint change for AI - "The Ghost" is Emerald
       if (aiPulseRef.current > 0.1) {
-          shellMat.current.attenuationColor.lerp(new THREE.Color('#00ff88'), aiPulseRef.current * 0.4);
+        shellMat.current.attenuationColor.lerp(new THREE.Color('#00ff88'), aiPulseRef.current * 0.4);
       }
     }
 
@@ -235,6 +263,9 @@ function ZenOrb(props: Props) {
       coreMat.current.uniforms.uAiPulse.value = aiPulseRef.current;
     }
   });
+
+  // Re-memoize shader to update octaves when tier changes
+  const fragShader = useMemo(() => getFragShader(tier.octaves), [tier.octaves]);
 
   return (
     <group ref={group}>
@@ -260,7 +291,7 @@ function ZenOrb(props: Props) {
         <shaderMaterial
           ref={coreMat}
           vertexShader={CORE_VERT}
-          fragmentShader={CORE_FRAG}
+          fragmentShader={fragShader}
           transparent
           depthWrite={false}
           blending={THREE.AdditiveBlending}
@@ -309,7 +340,7 @@ function ZenOrb(props: Props) {
 
 export default function OrbBreathVizZenSciFi(props: Props) {
   const tier = useMemo(() => resolveTier(props.quality), [props.quality]);
-  
+
   return (
     <Canvas
       dpr={tier.dpr}
