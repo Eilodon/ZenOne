@@ -1,6 +1,7 @@
 
 import * as Tone from 'tone';
 import { SoundPack, CueType, Language } from '../types';
+import { SAFE_SYNTHESIS_PRESETS } from './audio-synthesis-safe';
 
 // ============================================================================
 // PROFESSIONAL ZEN AUDIO ENGINE V2.2 (With Scheduling)
@@ -148,10 +149,7 @@ function buildMasterChain(): void {
         lowFrequency: 200,
         highFrequency: 5000
     });
-    warmth = new Tone.Distortion({
-        distortion: 0.05,
-        oversample: '4x'
-    });
+    warmth = new Tone.Distortion(SAFE_SYNTHESIS_PRESETS.warmth);
     compressor = new Tone.Compressor({
         threshold: -18,
         ratio: 2.5,
@@ -209,37 +207,17 @@ function buildSynthLayers(): SynthLayers {
     if (!masterEQ) buildMasterChain();
 
     const sub = new Tone.Synth({
-        oscillator: { type: 'sine' },
-        envelope: {
-            attack: 1.2,
-            decay: 0.4,
-            sustain: 0.65,
-            release: 2.2,
-            attackCurve: 'exponential',
-            decayCurve: 'exponential',
-            releaseCurve: 'exponential'
-        }
+        oscillator: SAFE_SYNTHESIS_PRESETS.synthLayers.sub.oscillator,
+        envelope: SAFE_SYNTHESIS_PRESETS.synthLayers.sub.envelope
     });
     sub.volume.value = -16;
 
     const body = new Tone.AMSynth({
-        harmonicity: 1.8,
-        oscillator: { type: 'triangle' },
-        envelope: {
-            attack: 0.6,
-            decay: 0.3,
-            sustain: 0.75,
-            release: 1.8,
-            attackCurve: 'cosine',
-            releaseCurve: 'exponential'
-        },
+        harmonicity: SAFE_SYNTHESIS_PRESETS.synthLayers.body.harmonicity,
+        oscillator: SAFE_SYNTHESIS_PRESETS.synthLayers.body.oscillator,
+        envelope: SAFE_SYNTHESIS_PRESETS.synthLayers.body.envelope,
         modulation: { type: 'sine' },
-        modulationEnvelope: {
-            attack: 0.7,
-            decay: 0.1,
-            sustain: 0.85,
-            release: 1.2
-        }
+        modulationEnvelope: SAFE_SYNTHESIS_PRESETS.synthLayers.body.modulationEnvelope
     });
     body.volume.value = -11;
 
@@ -294,8 +272,8 @@ function buildBreathEngine(): BreathEngine {
     const pink = new Tone.Noise('pink');
     const brown = new Tone.Noise('brown');
 
-    const formant1 = new Tone.Filter({ type: 'bandpass', frequency: 750, Q: 3.5, rolloff: -24 });
-    const formant2 = new Tone.Filter({ type: 'bandpass', frequency: 1150, Q: 4.0, rolloff: -24 });
+    const formant1 = new Tone.Filter(SAFE_SYNTHESIS_PRESETS.breathFormants.formant1);
+    const formant2 = new Tone.Filter(SAFE_SYNTHESIS_PRESETS.breathFormants.formant2);
     const formant3 = new Tone.Filter({ type: 'bandpass', frequency: 2400, Q: 2.8, rolloff: -12 });
     const highpass = new Tone.Filter({ type: 'highpass', frequency: 180, rolloff: -12 });
 
@@ -331,15 +309,12 @@ function buildBreathEngine(): BreathEngine {
 function createSingingBowl(): SingingBowl {
     if (!masterEQ) buildMasterChain();
 
-    const partials = [1.0, 2.756, 5.404, 8.933, 13.347, 18.644];
-    const amplitudes = partials.map((_, i) => Math.pow(0.65, i));
-
     const synth = new Tone.Synth({
-        oscillator: { type: 'custom', partials: amplitudes },
-        envelope: { attack: 0.008, decay: 5.5, sustain: 0.0, release: 8.0, decayCurve: 'exponential', releaseCurve: 'exponential' }
+        oscillator: { type: 'custom', partials: [1.0, 2.67, 5.40, 8.17] },
+        envelope: SAFE_SYNTHESIS_PRESETS.bowlPartials.envelope
     });
 
-    const vibrato = new Tone.LFO({ frequency: 4.2, min: -8, max: 8 });
+    const vibrato = new Tone.LFO(SAFE_SYNTHESIS_PRESETS.bowlPartials.vibrato);
     vibrato.connect(synth.detune);
     vibrato.start();
 
@@ -360,10 +335,7 @@ function initializeBowls(count: number = 3): void {
 
 function createCrystalBell(): CrystalBell {
     if (!masterEQ) buildMasterChain();
-    const synth = new Tone.MetalSynth({
-        envelope: { attack: 0.001, decay: 1.8, release: 0.6 },
-        harmonicity: 6.8, modulationIndex: 38, resonance: 7000, octaves: 1.8
-    });
+    const synth = new Tone.MetalSynth(SAFE_SYNTHESIS_PRESETS.crystalBell);
     const chorus = new Tone.Chorus({ frequency: 2.5, delayTime: 3.5, depth: 0.6, wet: 0.5 });
     chorus.start();
     const gain = new Tone.Gain(1.0);
