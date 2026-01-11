@@ -95,6 +95,55 @@ let lastCueKey = '';
 let lastCueTime = 0;
 
 // ============================================================================
+// [P0.3 UPGRADE] ADAPTIVE AUDIO MIXING - Device-Aware Processing
+// ============================================================================
+
+type DeviceAudioProfile = {
+  eq: { low: number; mid: number; high: number };
+  reverb: { decay: number; wet: number };
+  compression: { threshold: number; ratio: number };
+  spatializer: number;
+  description: string;
+};
+
+function getDeviceAudioProfile(): DeviceAudioProfile {
+  const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+  const isLowEnd = navigator.hardwareConcurrency < 4;
+  const cores = navigator.hardwareConcurrency || 4;
+
+  // Low-end mobile: Boost presence, reduce bass (weak speakers)
+  if (isMobile && isLowEnd) {
+    return {
+      eq: { low: -3, mid: +2, high: +1 },  // Cut bass, boost mids/highs
+      reverb: { decay: 2.0, wet: 0.15 },   // Lighter reverb
+      compression: { threshold: -15, ratio: 3.5 },  // More compression
+      spatializer: 0.25,                   // Reduced spatial width
+      description: 'Mobile Low-End (< 4 cores)'
+    };
+  }
+
+  // Standard mobile: Balanced with presence boost
+  if (isMobile) {
+    return {
+      eq: { low: -2, mid: +1, high: 0 },
+      reverb: { decay: 2.8, wet: 0.22 },
+      compression: { threshold: -16, ratio: 2.8 },
+      spatializer: 0.30,
+      description: `Mobile Standard (${cores} cores)`
+    };
+  }
+
+  // Desktop/High-end: Full-range, natural response
+  return {
+    eq: { low: -1, mid: +0.5, high: -0.5 },  // Current settings
+    reverb: { decay: 3.2, wet: 0.28 },
+    compression: { threshold: -18, ratio: 2.5 },
+    spatializer: 0.35,
+    description: `Desktop (${cores} cores)`
+  };
+}
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
@@ -130,8 +179,13 @@ function randomPick<T>(arr: T[]): T {
 
 function buildMasterChain(): void {
     if (masterBus) return;
+
+    // [P0.3 UPGRADE] Get adaptive audio profile based on device
+    const audioProfile = getDeviceAudioProfile();
+    console.log(`🎵 Audio Profile: ${audioProfile.description}`);
+
     masterBus = new Tone.Channel({ volume: -6 });
-    spatializer = new Tone.StereoWidener(0.35);
+    spatializer = new Tone.StereoWidener(audioProfile.spatializer);
 
     // [NEW] 3D Panner for breathing expansion/contraction illusion
     panner3D = new Tone.Panner3D({
@@ -143,24 +197,24 @@ function buildMasterChain(): void {
     });
 
     masterEQ = new Tone.EQ3({
-        low: -1,
-        mid: 0.5,
-        high: -0.5,
+        low: audioProfile.eq.low,
+        mid: audioProfile.eq.mid,
+        high: audioProfile.eq.high,
         lowFrequency: 200,
         highFrequency: 5000
     });
     warmth = new Tone.Distortion(SAFE_SYNTHESIS_PRESETS.warmth);
     compressor = new Tone.Compressor({
-        threshold: -18,
-        ratio: 2.5,
+        threshold: audioProfile.compression.threshold,
+        ratio: audioProfile.compression.ratio,
         attack: 0.08,
         release: 0.35,
         knee: 10
     });
     reverb = new Tone.Reverb({
-        decay: 3.2,
+        decay: audioProfile.reverb.decay,
         preDelay: 0.015,
-        wet: 0.28
+        wet: audioProfile.reverb.wet
     });
     limiter = new Tone.Limiter(-0.3);
     duckingGain = new Tone.Gain(1.0);

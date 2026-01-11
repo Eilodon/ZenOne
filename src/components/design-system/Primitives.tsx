@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lock, Circle, X, Check, AlertTriangle, Info, ThumbsUp, ThumbsDown, Copy } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 
 // --- TOKENS & UTILS ---
@@ -186,11 +187,11 @@ interface GestureBottomSheetProps {
     title?: React.ReactNode;
 }
 
-export const GestureBottomSheet: React.FC<GestureBottomSheetProps> = ({ 
-    open, 
-    onClose, 
-    children, 
-    title 
+export const GestureBottomSheet: React.FC<GestureBottomSheetProps> = ({
+    open,
+    onClose,
+    children,
+    title
 }) => {
   const [dy, setDy] = useState(0);
   const startY = useRef<number|null>(null);
@@ -202,32 +203,44 @@ export const GestureBottomSheet: React.FC<GestureBottomSheetProps> = ({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end" role="dialog" aria-modal="true">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
-        onClick={onClose}
-      />
-      
-      {/* Sheet */}
-      <div 
-        className="relative w-full bg-[#161719] border-t border-white/10 rounded-t-[24px] shadow-2xl transition-transform duration-300 ease-out pb-safe"
-        style={{ transform: `translateY(${Math.max(0, dy)}px)` }}
-        onTouchStart={e => { startY.current = e.touches[0].clientY; }}
-        onTouchMove={e => { 
-            if (startY.current === null) return;
-            const delta = e.touches[0].clientY - startY.current;
-            if (delta > 0) setDy(delta); 
-        }}
-        onTouchEnd={() => { 
-            if (dy > 100) onClose(); 
-            setDy(0); 
-            startY.current = null; 
-        }}
-      >
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end" role="dialog" aria-modal="true">
+          {/* [P1.1 UPGRADE] Backdrop with fade animation */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={onClose}
+          />
+
+          {/* [P1.1 UPGRADE] Sheet with spring physics slide-up */}
+          <motion.div
+            initial={{ y: "100%", opacity: 0 }}
+            animate={{ y: dy, opacity: 1 }}
+            exit={{ y: "100%", opacity: 0 }}
+            transition={{
+              type: "spring",
+              damping: 25,
+              stiffness: 300,
+              duration: 0.4
+            }}
+            className="relative w-full bg-[#161719] border-t border-white/10 rounded-t-[24px] shadow-2xl pb-safe"
+            onTouchStart={e => { startY.current = e.touches[0].clientY; }}
+            onTouchMove={e => {
+                if (startY.current === null) return;
+                const delta = e.touches[0].clientY - startY.current;
+                if (delta > 0) setDy(delta);
+            }}
+            onTouchEnd={() => {
+                if (dy > 100) onClose();
+                setDy(0);
+                startY.current = null;
+            }}
+          >
         {/* Handle */}
         <div className="w-full flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing">
             <div className="w-12 h-1.5 bg-white/20 rounded-full" />
@@ -243,7 +256,9 @@ export const GestureBottomSheet: React.FC<GestureBottomSheetProps> = ({
         <div className="p-6 max-h-[75vh] overflow-y-auto scrollbar-hide">
             {children}
         </div>
-      </div>
+      </motion.div>
     </div>
+      )}
+    </AnimatePresence>
   );
 };

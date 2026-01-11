@@ -1,6 +1,7 @@
 
 import { useMemo } from 'react';
 import { Flame, Trash2, Fingerprint, Lock, ShieldCheck } from 'lucide-react';
+import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -133,9 +134,38 @@ export function HistorySheet() {
                             <p className="text-xs font-light max-w-[200px] leading-relaxed">{t.history.noHistory}</p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            {history.map((item) => (
-                                <div key={item.id} className="flex items-center justify-between p-4 bg-white/[0.02] hover:bg-white/[0.04] rounded-2xl border border-white/5 transition-colors">
+                        <motion.div
+                            className="space-y-3"
+                            initial="hidden"
+                            animate="visible"
+                            variants={{
+                                visible: {
+                                    transition: {
+                                        staggerChildren: 0.08,
+                                        delayChildren: 0.12
+                                    }
+                                }
+                            }}
+                        >
+                            {history.map((item, idx) => (
+                                <motion.div
+                                    key={item.id}
+                                    variants={{
+                                        hidden: { opacity: 0, x: -20, scale: 0.95 },
+                                        visible: {
+                                            opacity: 1,
+                                            x: 0,
+                                            scale: 1,
+                                            transition: {
+                                                type: "spring",
+                                                damping: 20,
+                                                stiffness: 200,
+                                                delay: idx * 0.05
+                                            }
+                                        }
+                                    }}
+                                    className="flex items-center justify-between p-4 bg-white/[0.02] hover:bg-white/[0.04] rounded-2xl border border-white/5 transition-colors"
+                                >
                                     <div className="flex items-center gap-4">
                                         <div className="w-8 h-8 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[10px] font-bold text-white/50 font-mono">
                                             {item.cycles}
@@ -154,7 +184,7 @@ export function HistorySheet() {
                                             {Math.floor(item.durationSec / 60)}<span className="text-[8px] text-white/20 ml-0.5">{t.history.min}</span> {item.durationSec % 60}<span className="text-[8px] text-white/20 ml-0.5">{t.history.sec}</span>
                                         </div>
                                     </div>
-                                </div>
+                                </motion.div>
                             ))}
 
                             <button
@@ -163,7 +193,7 @@ export function HistorySheet() {
                             >
                                 <Trash2 size={12} /> {t.history.clear}
                             </button>
-                        </div>
+                        </motion.div>
                     )}
                 </div>
             </div>

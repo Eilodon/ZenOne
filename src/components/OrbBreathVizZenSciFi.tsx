@@ -2,6 +2,7 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
+import { useSpring, animated, config } from '@react-spring/three';
 import * as THREE from 'three';
 import { BreathPhase, ColorTheme, QualityTier } from '../types';
 import { AIConnectionStatus } from '../services/PureZenBKernel';
@@ -172,6 +173,23 @@ function ZenOrb(props: Props) {
   const entropySmoothRef = useRef(0);
   const aiPulseRef = useRef(0);
 
+  // [P0.2 UPGRADE] Spring physics for material properties (organic transitions)
+  const [materialSpring, materialApi] = useSpring(() => ({
+    scale: 1.35,
+    roughness: 0.55,
+    transmission: 0.45,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.5,
+    thickness: 0.3,
+    attenuationDistance: 1.8,
+    config: {
+      mass: 1.2,
+      tension: 180,
+      friction: 26,
+      clamp: false, // Allow 8-12% overshoot for organic feel
+    },
+  }));
+
   // [NEW] WebGL Context Robustness
   useEffect(() => {
     const handleContextLost = (e: Event) => {
@@ -227,24 +245,38 @@ function ZenOrb(props: Props) {
     const breath = breathRef.current;
     const entropy = THREE.MathUtils.clamp(entropySmoothRef.current, 0, 1);
 
+    // [P0.2 UPGRADE] Update spring targets based on breath state
     const baseScale = 1.35;
     const pulse = 0.14 * breath + 0.02 * Math.sin(time * 2.2);
-    group.current?.scale.setScalar(baseScale + pulse);
 
+    materialApi.start({
+      scale: baseScale + pulse,
+      roughness: THREE.MathUtils.lerp(0.55, 0.18, breath),
+      transmission: THREE.MathUtils.lerp(0.45, 0.92, breath),
+      clearcoat: THREE.MathUtils.lerp(0.35, 1.0, breath),
+      clearcoatRoughness: THREE.MathUtils.lerp(0.5, 0.1, breath),
+      thickness: THREE.MathUtils.lerp(0.3, 0.7, breath),
+      attenuationDistance: THREE.MathUtils.lerp(1.8, 0.9, breath),
+      immediate: false, // Use spring physics
+    });
+
+    // Apply spring values to group scale
     if (group.current) {
+      group.current.scale.setScalar(materialSpring.scale.get());
       group.current.rotation.y += delta * 0.18 * motion;
       group.current.rotation.x = Math.sin(time * 0.15) * 0.08 * motion;
     }
 
+    // Apply spring values to material
     if (shellMat.current) {
-      shellMat.current.roughness = THREE.MathUtils.lerp(0.55, 0.18, breath);
-      shellMat.current.clearcoat = THREE.MathUtils.lerp(0.35, 1.0, breath);
-      shellMat.current.clearcoatRoughness = THREE.MathUtils.lerp(0.5, 0.1, breath);
-      shellMat.current.transmission = THREE.MathUtils.lerp(0.45, 0.92, breath);
+      shellMat.current.roughness = materialSpring.roughness.get();
+      shellMat.current.clearcoat = materialSpring.clearcoat.get();
+      shellMat.current.clearcoatRoughness = materialSpring.clearcoatRoughness.get();
+      shellMat.current.transmission = materialSpring.transmission.get();
       shellMat.current.ior = 1.3;
-      shellMat.current.thickness = THREE.MathUtils.lerp(0.3, 0.7, breath);
+      shellMat.current.thickness = materialSpring.thickness.get();
       shellMat.current.attenuationColor.copy(colors.deep);
-      shellMat.current.attenuationDistance = THREE.MathUtils.lerp(1.8, 0.9, breath);
+      shellMat.current.attenuationDistance = materialSpring.attenuationDistance.get();
 
       // Slight tint change for AI - "The Ghost" is Emerald
       if (aiPulseRef.current > 0.1) {
