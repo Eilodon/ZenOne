@@ -195,10 +195,46 @@ export const GestureBottomSheet: React.FC<GestureBottomSheetProps> = ({
 }) => {
   const [dy, setDy] = useState(0);
   const startY = useRef<number|null>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
+  // [P2.1 UPGRADE] Focus trap and keyboard navigation
   useEffect(() => {
-    if (!open) setDy(0);
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    if (!open) {
+      setDy(0);
+      return;
+    }
+
+    // Focus close button when sheet opens (or first focusable element)
+    setTimeout(() => {
+      closeButtonRef.current?.focus();
+    }, 100);
+
+    // Keyboard handler
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      // Tab key focus trap
+      if (e.key === 'Tab' && sheetRef.current) {
+        const focusableElements = sheetRef.current.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const firstElement = focusableElements[0] as HTMLElement;
+        const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+        if (e.shiftKey && document.activeElement === firstElement) {
+          lastElement?.focus();
+          e.preventDefault();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          firstElement?.focus();
+          e.preventDefault();
+        }
+      }
+    };
+
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
@@ -206,7 +242,7 @@ export const GestureBottomSheet: React.FC<GestureBottomSheetProps> = ({
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-50 flex flex-col justify-end" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
           {/* [P1.1 UPGRADE] Backdrop with fade animation */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -215,10 +251,13 @@ export const GestureBottomSheet: React.FC<GestureBottomSheetProps> = ({
             transition={{ duration: 0.25, ease: "easeOut" }}
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={onClose}
+            aria-label="Close dialog"
           />
 
           {/* [P1.1 UPGRADE] Sheet with spring physics slide-up */}
+          {/* [P2.1 UPGRADE] Focus trap and accessibility */}
           <motion.div
+            ref={sheetRef}
             initial={{ y: "100%", opacity: 0 }}
             animate={{ y: dy, opacity: 1 }}
             exit={{ y: "100%", opacity: 0 }}
@@ -242,14 +281,21 @@ export const GestureBottomSheet: React.FC<GestureBottomSheetProps> = ({
             }}
           >
         {/* Handle */}
-        <div className="w-full flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing">
+        <div className="w-full flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing" aria-hidden="true">
             <div className="w-12 h-1.5 bg-white/20 rounded-full" />
         </div>
-        
+
         {title && (
             <div className="px-6 py-2 border-b border-white/5 flex items-center justify-between">
-                <div className="text-lg font-serif text-white/90">{title}</div>
-                <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10"><X size={16} className="text-white/60"/></button>
+                <div id="sheet-title" className="text-lg font-serif text-white/90">{title}</div>
+                <button
+                  ref={closeButtonRef}
+                  onClick={onClose}
+                  className="p-2 bg-white/5 rounded-full hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-[#161719] transition-all"
+                  aria-label="Close dialog"
+                >
+                  <X size={16} className="text-white/60"/>
+                </button>
             </div>
         )}
         

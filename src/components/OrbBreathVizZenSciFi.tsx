@@ -2,6 +2,7 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
+import { EffectComposer, Bloom, DepthOfField, Vignette } from '@react-three/postprocessing';
 import { useSpring, animated, config } from '@react-spring/three';
 import * as THREE from 'three';
 import { BreathPhase, ColorTheme, QualityTier } from '../types';
@@ -372,6 +373,7 @@ function ZenOrb(props: Props) {
 
 export default function OrbBreathVizZenSciFi(props: Props) {
   const tier = useMemo(() => resolveTier(props.quality), [props.quality]);
+  const shouldUsePostFX = props.quality === 'high' || props.quality === 'medium' || (props.quality === 'auto' && tier.seg >= 40);
 
   return (
     <Canvas
@@ -383,6 +385,33 @@ export default function OrbBreathVizZenSciFi(props: Props) {
       <ambientLight intensity={0.55} />
       <pointLight position={[3, 3, 4]} intensity={1.2} />
       <ZenOrb {...props} />
+
+      {/* [P2.3 UPGRADE] Post-processing effects (quality-based) */}
+      {shouldUsePostFX && (
+        <EffectComposer multisampling={4}>
+          {/* Bloom for glow */}
+          <Bloom
+            intensity={0.8}
+            luminanceThreshold={0.3}
+            luminanceSmoothing={0.9}
+            radius={0.6}
+          />
+
+          {/* Depth of Field (subtle focus effect) */}
+          <DepthOfField
+            focusDistance={0.01}
+            focalLength={0.05}
+            bokehScale={1.5}
+          />
+
+          {/* Vignette for cinematic edge darkening */}
+          <Vignette
+            offset={0.35}
+            darkness={0.6}
+            eskil={false}
+          />
+        </EffectComposer>
+      )}
     </Canvas>
   );
 }

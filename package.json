@@ -15,6 +15,7 @@
     "@react-spring/web": "^10.0.3",
     "@react-three/drei": "^9.108.0",
     "@react-three/fiber": "^8.16.8",
+    "@react-three/postprocessing": "^3.0.4",
     "@tensorflow-models/face-landmarks-detection": "^1.0.2",
     "@tensorflow/tfjs": "^4.17.0",
     "clsx": "^2.1.1",
@@ -23,6 +24,7 @@
     "lucide-react": "^0.395.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "recharts": "^3.6.0",
     "three": "^0.165.0",
     "tone": "^15.0.4",
     "zustand": "^4.5.2"
