@@ -17,7 +17,7 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
-    plugins: []
+    plugins: () => []
   },
   optimizeDeps: {
     exclude: ['@tensorflow/tfjs']
@@ -57,6 +57,7 @@ export default defineConfig({
         ]
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB (TensorFlow bundle is large)
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {

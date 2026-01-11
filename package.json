@@ -15,7 +15,7 @@
     "@react-spring/web": "^10.0.3",
     "@react-three/drei": "^9.108.0",
     "@react-three/fiber": "^8.16.8",
-    "@react-three/postprocessing": "^3.0.4",
+    "@react-three/postprocessing": "^2.16.4",
     "@tensorflow-models/face-landmarks-detection": "^1.0.2",
     "@tensorflow/tfjs": "^4.17.0",
     "clsx": "^2.1.1",

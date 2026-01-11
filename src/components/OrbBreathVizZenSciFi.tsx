@@ -3,7 +3,7 @@ import React, { useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Environment } from '@react-three/drei';
 import { EffectComposer, Bloom, DepthOfField, Vignette } from '@react-three/postprocessing';
-import { useSpring, animated, config } from '@react-spring/three';
+import { useSpring } from '@react-spring/three';
 import * as THREE from 'three';
 import { BreathPhase, ColorTheme, QualityTier } from '../types';
 import { AIConnectionStatus } from '../services/PureZenBKernel';
