@@ -138,6 +138,106 @@
          border: 1px solid rgba(255, 255, 255, 0.08);
          box-shadow: 0 6px 18px rgba(0,0,0,0.18);
       }
+
+      /* [P2.1 UPGRADE] Accessibility Enhancements */
+
+      /* Focus indicators for keyboard navigation */
+      *:focus-visible {
+        outline: 2px solid #3B82F6;
+        outline-offset: 3px;
+        border-radius: 4px;
+      }
+
+      /* Skip to main content link (for screen readers) */
+      .skip-to-main {
+        position: absolute;
+        top: -40px;
+        left: 0;
+        background: #3B82F6;
+        color: white;
+        padding: 8px 16px;
+        text-decoration: none;
+        border-radius: 0 0 4px 0;
+        z-index: 10000;
+        transition: top 0.2s;
+      }
+
+      .skip-to-main:focus {
+        top: 0;
+      }
+
+      /* High contrast mode support */
+      @media (prefers-contrast: high) {
+        .glass-card,
+        .glass {
+          border-width: 2px;
+          border-color: rgba(255, 255, 255, 0.3);
+          background: rgba(22, 23, 25, 1); /* Opaque in high contrast */
+        }
+
+        button,
+        a {
+          border: 2px solid currentColor;
+        }
+
+        *:focus-visible {
+          outline-width: 3px;
+          outline-offset: 4px;
+        }
+      }
+
+      /* Reduced transparency for accessibility */
+      @media (prefers-reduced-transparency) {
+        .glass {
+          backdrop-filter: none;
+          background: rgba(22, 23, 25, 1);
+        }
+
+        .glass-card {
+          background: #161719;
+          backdrop-filter: none;
+        }
+      }
+
+      /* Screen reader only content */
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border-width: 0;
+      }
+
+      /* Visible focus for high contrast keyboard users */
+      @media (forced-colors: active) {
+        *:focus-visible {
+          outline: 3px solid CanvasText;
+        }
+
+        button, a {
+          border: 1px solid ButtonText;
+        }
+      }
+
+      /* Reduced motion support */
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+          scroll-behavior: auto !important;
+        }
+
+        .noise-overlay {
+          display: none;
+        }
+      }
     </style>
 <script type="importmap">
 {

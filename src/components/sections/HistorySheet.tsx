@@ -1,6 +1,8 @@
 
 import { useMemo } from 'react';
-import { Flame, Trash2, Fingerprint, Lock, ShieldCheck } from 'lucide-react';
+import { Flame, Trash2, Fingerprint, Lock, ShieldCheck, TrendingUp } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import clsx from 'clsx';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -56,6 +58,31 @@ export function HistorySheet() {
         }).sort((a, b) => b.score - a.score);
     }, [safetyRegistry]);
 
+    // [P1.3 UPGRADE] Data visualization: Emotional journey & bio-metrics trends
+    const chartData = useMemo(() => {
+        // Get last 10 sessions for trend analysis
+        const recentSessions = history.slice(-10).reverse();
+
+        return recentSessions.map((session, idx) => {
+            const date = new Date(session.timestamp);
+            const timeLabel = date.toLocaleDateString(userSettings.language === 'vi' ? 'vi-VN' : 'en-US', {
+                month: 'short',
+                day: 'numeric'
+            });
+
+            return {
+                id: session.id,
+                time: timeLabel,
+                session: idx + 1,
+                arousal: session.finalBelief?.arousal ?? 0.5,
+                valence: session.finalBelief?.valence ?? 0,
+                rhythm: session.finalBelief?.rhythm_alignment ?? 0.5,
+                attention: session.finalBelief?.attention ?? 0.5,
+                duration: session.durationSec / 60, // minutes
+            };
+        });
+    }, [history, userSettings.language]);
+
     return (
         <GestureBottomSheet
             open={isHistoryOpen}
@@ -81,6 +108,128 @@ export function HistorySheet() {
                         <div className="text-white/30 font-caps text-[9px] tracking-widest">{t.ui.streak}</div>
                     </div>
                 </div>
+
+                {/* [P1.3 UPGRADE] EMOTIONAL JOURNEY TRENDS */}
+                {chartData.length >= 3 && (
+                    <section className="bg-white/[0.02] border border-white/5 rounded-[24px] p-6 backdrop-blur-md">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="text-[10px] text-white/40 uppercase tracking-[0.2em] font-bold flex items-center gap-2">
+                                <TrendingUp size={12} className="text-blue-500" /> Emotional Journey
+                            </div>
+                            <div className="text-[9px] text-white/20 font-mono">Last {chartData.length} Sessions</div>
+                        </div>
+
+                        {/* Arousal & Valence Dual Chart */}
+                        <div className="mb-6">
+                            <div className="text-xs text-white/50 mb-2 pl-2">Emotional State Over Time</div>
+                            <ResponsiveContainer width="100%" height={180}>
+                                <AreaChart data={chartData}>
+                                    <defs>
+                                        <linearGradient id="arousalGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                                            <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                                        </linearGradient>
+                                        <linearGradient id="valenceGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#16A34A" stopOpacity={0.3}/>
+                                            <stop offset="95%" stopColor="#16A34A" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <XAxis
+                                        dataKey="time"
+                                        stroke="#475569"
+                                        style={{ fontSize: 9, fill: '#64748B' }}
+                                        tickLine={false}
+                                    />
+                                    <YAxis
+                                        stroke="#475569"
+                                        domain={[-1, 1]}
+                                        ticks={[-1, 0, 1]}
+                                        style={{ fontSize: 9, fill: '#64748B' }}
+                                        tickLine={false}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: '#161719',
+                                            border: '1px solid rgba(255,255,255,0.1)',
+                                            borderRadius: '8px',
+                                            fontSize: '10px'
+                                        }}
+                                        labelStyle={{ color: '#CBD5E1', fontWeight: 'bold' }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="valence"
+                                        stroke="#16A34A"
+                                        strokeWidth={2}
+                                        fill="url(#valenceGradient)"
+                                        name="Valence"
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="arousal"
+                                        stroke="#3B82F6"
+                                        strokeWidth={2}
+                                        fill="url(#arousalGradient)"
+                                        name="Arousal"
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                            <div className="flex items-center justify-center gap-6 mt-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-1 bg-blue-500 rounded-full" />
+                                    <span className="text-[9px] text-white/40">Arousal</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-1 bg-emerald-500 rounded-full" />
+                                    <span className="text-[9px] text-white/40">Valence</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Rhythm Alignment Progress */}
+                        <div>
+                            <div className="text-xs text-white/50 mb-2 pl-2">Bio-Resonance Progress</div>
+                            <ResponsiveContainer width="100%" height={140}>
+                                <LineChart data={chartData}>
+                                    <XAxis
+                                        dataKey="time"
+                                        stroke="#475569"
+                                        style={{ fontSize: 9, fill: '#64748B' }}
+                                        tickLine={false}
+                                    />
+                                    <YAxis
+                                        stroke="#475569"
+                                        domain={[0, 1]}
+                                        ticks={[0, 0.5, 1]}
+                                        style={{ fontSize: 9, fill: '#64748B' }}
+                                        tickLine={false}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{
+                                            backgroundColor: '#161719',
+                                            border: '1px solid rgba(255,255,255,0.1)',
+                                            borderRadius: '8px',
+                                            fontSize: '10px'
+                                        }}
+                                        labelStyle={{ color: '#CBD5E1', fontWeight: 'bold' }}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="rhythm"
+                                        stroke="#A855F7"
+                                        strokeWidth={2.5}
+                                        dot={{ fill: '#A855F7', r: 4, strokeWidth: 2, stroke: '#1F2937' }}
+                                        activeDot={{ r: 6, fill: '#A855F7', stroke: '#1F2937', strokeWidth: 3 }}
+                                        name="Rhythm Alignment"
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                            <div className="text-[9px] text-white/30 text-center mt-2 leading-relaxed">
+                                Shows how well your breathing synchronized with your heart rhythm (HRV coherence)
+                            </div>
+                        </div>
+                    </section>
+                )}
 
                 {/* BIO-AFFINITY MATRIX (Trauma Registry Viz) */}
                 <section className="bg-white/[0.02] border border-white/5 rounded-[24px] p-6 backdrop-blur-md">
@@ -133,9 +282,38 @@ export function HistorySheet() {
                             <p className="text-xs font-light max-w-[200px] leading-relaxed">{t.history.noHistory}</p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            {history.map((item) => (
-                                <div key={item.id} className="flex items-center justify-between p-4 bg-white/[0.02] hover:bg-white/[0.04] rounded-2xl border border-white/5 transition-colors">
+                        <motion.div
+                            className="space-y-3"
+                            initial="hidden"
+                            animate="visible"
+                            variants={{
+                                visible: {
+                                    transition: {
+                                        staggerChildren: 0.08,
+                                        delayChildren: 0.12
+                                    }
+                                }
+                            }}
+                        >
+                            {history.map((item, idx) => (
+                                <motion.div
+                                    key={item.id}
+                                    variants={{
+                                        hidden: { opacity: 0, x: -20, scale: 0.95 },
+                                        visible: {
+                                            opacity: 1,
+                                            x: 0,
+                                            scale: 1,
+                                            transition: {
+                                                type: "spring",
+                                                damping: 20,
+                                                stiffness: 200,
+                                                delay: idx * 0.05
+                                            }
+                                        }
+                                    }}
+                                    className="flex items-center justify-between p-4 bg-white/[0.02] hover:bg-white/[0.04] rounded-2xl border border-white/5 transition-colors"
+                                >
                                     <div className="flex items-center gap-4">
                                         <div className="w-8 h-8 rounded-full bg-white/5 border border-white/5 flex items-center justify-center text-[10px] font-bold text-white/50 font-mono">
                                             {item.cycles}
@@ -154,7 +332,7 @@ export function HistorySheet() {
                                             {Math.floor(item.durationSec / 60)}<span className="text-[8px] text-white/20 ml-0.5">{t.history.min}</span> {item.durationSec % 60}<span className="text-[8px] text-white/20 ml-0.5">{t.history.sec}</span>
                                         </div>
                                     </div>
-                                </div>
+                                </motion.div>
                             ))}
 
                             <button
@@ -163,7 +341,7 @@ export function HistorySheet() {
                             >
                                 <Trash2 size={12} /> {t.history.clear}
                             </button>
-                        </div>
+                        </motion.div>
                     )}
                 </div>
             </div>
